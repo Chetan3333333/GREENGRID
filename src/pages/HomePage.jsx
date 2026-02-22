@@ -109,40 +109,8 @@ export default function HomePage() {
                 </div>
             </motion.div>
 
-            {/* Live Bids Section */}
-            <motion.div {...fadeUp(0.35)}>
-                <div className="section-header" style={{ marginTop: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span className="section-title">Live Bids</span>
-                        <motion.div animate={{ opacity: [1, 0.4, 1] }} transition={{ repeat: Infinity, duration: 1.5 }} style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444' }} />
-                    </div>
-                    <span className="section-link" onClick={() => navigate('/bidding')}>View All</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {[
-                        { item: '📱 Smartphone (E-Waste)', bids: 5, highest: '₹550', time: '18 min left' },
-                        { item: '🧴 PET Plastic 3kg', bids: 3, highest: '₹190', time: '42 min left' },
-                        { item: '💻 Laptop Motherboard', bids: 7, highest: '₹1,200', time: '8 min left' },
-                    ].map((bid, i) => (
-                        <motion.div
-                            key={i}
-                            className="list-item"
-                            style={{ cursor: 'pointer' }}
-                            onClick={() => navigate('/bidding')}
-                            whileTap={{ scale: 0.98 }}
-                        >
-                            <span style={{ fontSize: '0.85rem' }}>{bid.item}</span>
-                            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{bid.bids} bids</span>
-                                <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#10b981' }}>{bid.highest}</span>
-                            </div>
-                        </motion.div>
-                    ))}
-                </div>
-            </motion.div>
-
             {/* Quick Actions */}
-            <motion.div {...fadeUp(0.4)}>
+            <motion.div {...fadeUp(0.35)}>
                 <div className="section-header" style={{ marginTop: 8 }}>
                     <span className="section-title">Quick Actions</span>
                 </div>

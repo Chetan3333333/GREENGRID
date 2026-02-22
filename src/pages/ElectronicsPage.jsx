@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
     Cpu, Heart, Gavel, Recycle, ChevronRight, Star, MapPin, Shield,
-    TrendingUp, Package, ArrowRight, Coins
+    TrendingUp, Package, Timer, Truck, CheckCircle, Coins, X
 } from 'lucide-react';
 
 const fadeUp = (d = 0) => ({
@@ -13,9 +13,9 @@ const fadeUp = (d = 0) => ({
 });
 
 const actions = [
-    { id: 'donate', label: 'Donate for Reuse', icon: Heart, desc: 'Give functional devices to NGOs & schools', color: '#10b981', coins: '+200 🪙', route: 'donate' },
-    { id: 'exchange', label: 'Post to Material Exchange', icon: Gavel, desc: 'Let certified recyclers bid for recovery value', color: '#f59e0b', coins: 'Earn ₹', route: 'bidding' },
-    { id: 'recycle', label: 'Certified Recycling', icon: Recycle, desc: 'Schedule free pickup by recycling center', color: '#3b82f6', coins: '+80 🪙', route: 'recycle' },
+    { id: 'donate', label: 'Donate for Reuse', icon: Heart, desc: 'Give functional devices to NGOs & schools', color: '#10b981', coins: '+200 🪙' },
+    { id: 'exchange', label: 'Post to Material Exchange', icon: Gavel, desc: 'Let certified recyclers bid for recovery value', color: '#f59e0b', coins: 'Earn ₹' },
+    { id: 'recycle', label: 'Certified Recycling', icon: Recycle, desc: 'Schedule free pickup by recycling center', color: '#3b82f6', coins: '+80 🪙' },
 ];
 
 const ngosList = [
@@ -24,14 +24,37 @@ const ngosList = [
     { name: 'Teach For India', type: 'Classrooms', items: 'Projectors, Laptops' },
 ];
 
-const recoveryExamples = [
-    { item: 'Smartphone', value: '₹350–₹580', materials: 'Cu, Au, Li' },
-    { item: 'Laptop', value: '₹800–₹1,400', materials: 'Cu, Al, Pd' },
-    { item: 'PCB Board', value: '₹200–₹450', materials: 'Au, Ag, Cu' },
+const ewasteBids = [
+    {
+        id: 1, item: '💻 Laptop Motherboard (450g)', category: 'PCB & Components',
+        materials: 'Gold, Silver, Copper, Palladium', aiValue: '₹800 – ₹1,400',
+        bids: [
+            { merchant: 'GreenTech Recyclers', rating: 4.9, bid: 1250, pickup: '2 hours', method: 'Certified smelting', verified: true },
+            { merchant: 'EcoCircuit Solutions', rating: 4.7, bid: 1180, pickup: '4 hours', method: 'Component-level recovery', verified: true },
+            { merchant: 'UrbanMine Tech', rating: 4.8, bid: 1320, pickup: '3 hours', method: 'Pyrometallurgy', verified: true },
+        ],
+    },
+    {
+        id: 2, item: '📱 Smartphones x3 (Non-functional)', category: 'Mobile Devices',
+        materials: 'Copper, Lithium, Gold trace', aiValue: '₹600 – ₹950',
+        bids: [
+            { merchant: 'ReNew Materials Hub', rating: 4.6, bid: 880, pickup: 'Next day', method: 'Hydrometallurgical extraction', verified: true },
+            { merchant: 'CircularTech India', rating: 4.5, bid: 820, pickup: '5 hours', method: 'Mechanical recovery', verified: true },
+        ],
+    },
+    {
+        id: 3, item: '🖥️ Desktop CPU + RAM Sticks', category: 'Computer Parts',
+        materials: 'Gold pins, Copper, Aluminium', aiValue: '₹400 – ₹700',
+        bids: [
+            { merchant: 'GreenTech Recyclers', rating: 4.9, bid: 650, pickup: '2 hours', method: 'Precious metal recovery', verified: true },
+            { merchant: 'MetalRecover Pro', rating: 4.4, bid: 580, pickup: '6 hours', method: 'Acid-free extraction', verified: true },
+        ],
+    },
 ];
 
 export default function ElectronicsPage() {
     const [selected, setSelected] = useState(null);
+    const [expandedBid, setExpandedBid] = useState(null);
     const navigate = useNavigate();
 
     return (
@@ -87,28 +110,98 @@ export default function ElectronicsPage() {
                 </div>
             </motion.div>
 
-            {/* Exchange Section */}
+            {/* E-Waste Merchant Bidding */}
             {selected === 'exchange' && (
                 <motion.div {...fadeUp(0.1)} style={{ marginTop: 20 }}>
                     <div className="section-header">
-                        <span className="section-title">Recovery Value Estimates</span>
-                        <span className="badge badge-gold"><TrendingUp size={10} /> AI Valued</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span className="section-title">E-Waste Merchant Bids</span>
+                            <motion.div animate={{ opacity: [1, 0.4, 1] }} transition={{ repeat: Infinity, duration: 1.5 }} style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444' }} />
+                        </div>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {recoveryExamples.map((ex, i) => (
-                            <div key={i} className="list-item">
-                                <Package size={16} color="#f59e0b" />
-                                <div style={{ flex: 1 }}>
-                                    <p style={{ fontWeight: 600, fontSize: '0.85rem' }}>{ex.item}</p>
-                                    <p style={{ fontSize: '0.7rem', color: '#64748b' }}>Recoverable: {ex.materials}</p>
-                                </div>
-                                <span style={{ fontWeight: 700, color: '#fbbf24', fontSize: '0.85rem' }}>{ex.value}</span>
-                            </div>
-                        ))}
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        {ewasteBids.map((listing) => {
+                            const highestBid = Math.max(...listing.bids.map(b => b.bid));
+                            const isExpanded = expandedBid === listing.id;
+
+                            return (
+                                <motion.div
+                                    key={listing.id}
+                                    className="card"
+                                    layout
+                                    style={{ overflow: 'hidden' }}
+                                >
+                                    {/* Listing Header */}
+                                    <div
+                                        style={{ cursor: 'pointer' }}
+                                        onClick={() => setExpandedBid(isExpanded ? null : listing.id)}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                                            <div>
+                                                <p style={{ fontWeight: 700, fontSize: '0.95rem' }}>{listing.item}</p>
+                                                <p style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 2 }}>{listing.materials}</p>
+                                            </div>
+                                            <div style={{ textAlign: 'right' }}>
+                                                <span style={{ fontWeight: 800, color: '#10b981', fontSize: '1.1rem' }}>₹{highestBid}</span>
+                                                <p style={{ fontSize: '0.6rem', color: '#64748b' }}>highest bid</p>
+                                            </div>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: 8 }}>
+                                            <span className="badge badge-blue">{listing.category}</span>
+                                            <span className="badge badge-gold">AI: {listing.aiValue}</span>
+                                            <span className="badge" style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)', fontSize: '0.6rem' }}>
+                                                {listing.bids.length} bids
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Expanded Bids */}
+                                    <AnimatePresence>
+                                        {isExpanded && (
+                                            <motion.div
+                                                initial={{ opacity: 0, height: 0 }}
+                                                animate={{ opacity: 1, height: 'auto' }}
+                                                exit={{ opacity: 0, height: 0 }}
+                                                style={{ marginTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 14 }}
+                                            >
+                                                <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: 10 }}>Certified Recycler Bids:</p>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                                    {listing.bids.sort((a, b) => b.bid - a.bid).map((bid, i) => (
+                                                        <div key={i} style={s.bidRow}>
+                                                            <div style={s.merchAvatar}>{bid.merchant.charAt(0)}</div>
+                                                            <div style={{ flex: 1 }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                                    <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{bid.merchant}</span>
+                                                                    {bid.verified && <Shield size={12} color="#10b981" />}
+                                                                </div>
+                                                                <div style={{ display: 'flex', gap: 10, marginTop: 3 }}>
+                                                                    <span style={s.bidDetail}><Star size={10} color="#f59e0b" fill="#f59e0b" /> {bid.rating}</span>
+                                                                    <span style={s.bidDetail}><Truck size={10} /> {bid.pickup}</span>
+                                                                </div>
+                                                                <p style={{ fontSize: '0.68rem', color: '#64748b', marginTop: 3 }}>{bid.method}</p>
+                                                            </div>
+                                                            <div style={{ textAlign: 'right' }}>
+                                                                <p style={{ fontWeight: 800, fontSize: '1.05rem', color: i === 0 ? '#10b981' : '#f1f5f9' }}>₹{bid.bid}</p>
+                                                                {i === 0 && <span style={{ fontSize: '0.55rem', color: '#10b981', fontWeight: 600 }}>HIGHEST</span>}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <button
+                                                    className="btn btn-primary btn-sm"
+                                                    style={{ width: '100%', marginTop: 12 }}
+                                                    onClick={() => navigate('/bidding')}
+                                                >
+                                                    <Gavel size={14} /> Accept Best Bid (₹{highestBid})
+                                                </button>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </motion.div>
+                            );
+                        })}
                     </div>
-                    <button className="btn btn-primary btn-lg" style={{ width: '100%', marginTop: 16 }} onClick={() => navigate('/bidding')}>
-                        <Gavel size={16} /> Post to Material Exchange
-                    </button>
                 </motion.div>
             )}
 
@@ -162,5 +255,20 @@ const s = {
         width: 42, height: 42, borderRadius: 12,
         background: 'rgba(59,130,246,0.12)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
+    },
+    merchAvatar: {
+        width: 36, height: 36, borderRadius: 10,
+        background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontWeight: 800, fontSize: '0.85rem', color: '#fff',
+    },
+    bidRow: {
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '10px 0',
+        borderBottom: '1px solid rgba(255,255,255,0.04)',
+    },
+    bidDetail: {
+        display: 'flex', alignItems: 'center', gap: 3,
+        fontSize: '0.7rem', color: '#94a3b8',
     },
 };
