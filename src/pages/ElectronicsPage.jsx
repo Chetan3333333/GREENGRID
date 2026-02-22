@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
     Cpu, Heart, Gavel, Recycle, ChevronRight, Star, MapPin, Shield,
-    TrendingUp, Package, Timer, Truck, CheckCircle, Coins, X
+    TrendingUp, Package, Timer, Truck, CheckCircle, Coins, X, Handshake
 } from 'lucide-react';
 
 const fadeUp = (d = 0) => ({
@@ -14,7 +14,8 @@ const fadeUp = (d = 0) => ({
 
 const actions = [
     { id: 'donate', label: 'Donate for Reuse', icon: Heart, desc: 'Give functional devices to NGOs & schools', color: '#10b981', coins: '+200 🪙' },
-    { id: 'exchange', label: 'Post to Material Exchange', icon: Gavel, desc: 'Let certified recyclers bid for recovery value', color: '#f59e0b', coins: 'Earn ₹' },
+    { id: 'exchange', label: 'Smart Bidding', icon: Gavel, desc: 'Multiple certified recyclers bid — best price wins', color: '#f59e0b', coins: 'Earn ₹' },
+    { id: 'direct', label: 'Smart Deal Mode', icon: Handshake, desc: 'One-to-one verified merchant offer & negotiation', color: '#8b5cf6', coins: 'Earn ₹' },
     { id: 'recycle', label: 'Certified Recycling', icon: Recycle, desc: 'Schedule free pickup by recycling center', color: '#3b82f6', coins: '+80 🪙' },
 ];
 
@@ -240,6 +241,35 @@ export default function ElectronicsPage() {
                         </p>
                         <button className="btn btn-primary" style={{ marginTop: 16 }}>
                             Schedule Free Pickup <ChevronRight size={14} />
+                        </button>
+                    </div>
+                </motion.div>
+            )}
+
+            {/* Direct Deal Section */}
+            {selected === 'direct' && (
+                <motion.div {...fadeUp(0.1)} style={{ marginTop: 20 }}>
+                    <div className="card" style={{ textAlign: 'center', padding: 28 }}>
+                        <span style={{ fontSize: '3rem' }}>🤝</span>
+                        <h3 style={{ fontWeight: 700, marginTop: 12 }}>Verified Merchant Offer</h3>
+                        <p style={{ fontSize: '0.82rem', color: '#94a3b8', marginTop: 8, lineHeight: 1.5 }}>
+                            Select a certified e-waste recycler and negotiate a fair price directly. Structured offer system — no free chatting.
+                        </p>
+                        <div className="card card-sm" style={{ marginTop: 14, textAlign: 'left', background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)' }}>
+                            <p style={{ fontWeight: 600, fontSize: '0.82rem', marginBottom: 8 }}>How it works:</p>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {[
+                                    '1. Pick a verified e-waste merchant',
+                                    '2. Merchant evaluates & sends price offer',
+                                    '3. Accept, Counter Offer, or Request Inspection',
+                                    '4. Agreement confirmed → Doorstep pickup',
+                                ].map((step, i) => (
+                                    <p key={i} style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{step}</p>
+                                ))}
+                            </div>
+                        </div>
+                        <button className="btn btn-primary" style={{ marginTop: 16, width: '100%' }} onClick={() => navigate('/direct-deal')}>
+                            <Handshake size={16} /> Start Smart Deal
                         </button>
                     </div>
                 </motion.div>

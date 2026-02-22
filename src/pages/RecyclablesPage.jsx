@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
     Recycle, Package, ChevronRight, Truck, MapPin, Gavel,
-    TrendingUp, Shield, Star, Timer
+    TrendingUp, Shield, Star, Timer, Handshake
 } from 'lucide-react';
 
 const fadeUp = (d = 0) => ({
@@ -138,7 +138,8 @@ export default function RecyclablesPage() {
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                         {[
-                            { label: 'Post to Material Exchange', desc: 'Let certified recyclers bid for your material', icon: '⚡', coins: 'Earn ₹', primary: true },
+                            { label: 'Smart Bidding', desc: 'Multiple certified recyclers bid for your material', icon: '⚡', coins: 'Earn ₹', primary: true },
+                            { label: 'Smart Deal Mode', desc: 'Direct price agreement with a verified merchant', icon: '🤝', coins: 'Earn ₹', primary: true, isDeal: true },
                             { label: 'Donate for Reuse', desc: 'Give to craft groups or workshops', icon: '🎨', coins: '+60 🪙', primary: false },
                             { label: 'Drop at Recycling Center', desc: 'Find nearest certified center', icon: '🏭', coins: '+30 🪙', primary: false },
                         ].map((act, i) => (
@@ -147,6 +148,7 @@ export default function RecyclablesPage() {
                                 className="list-item"
                                 style={{ cursor: 'pointer' }}
                                 whileTap={{ scale: 0.98 }}
+                                onClick={act.isDeal ? () => navigate('/direct-deal') : undefined}
                             >
                                 <span style={{ fontSize: '1.4rem' }}>{act.icon}</span>
                                 <div style={{ flex: 1 }}>

@@ -13,6 +13,7 @@ const pageTitles = {
   '/credit-score': 'Green Score',
   '/marketplace': 'Material Exchange',
   '/bidding': 'Live Bidding',
+  '/direct-deal': 'Smart Deal',
   '/profile': 'Profile',
 };
 
