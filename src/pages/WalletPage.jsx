@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Coins, ArrowUpRight, ArrowDownLeft, TrendingUp, Gift, ShoppingBag, ChevronRight } from 'lucide-react';
+import {
+    Wallet, TrendingUp, TrendingDown, Coins, Gift,
+    ChevronRight, ArrowUpRight, ArrowDownLeft, Gavel, Leaf
+} from 'lucide-react';
 
 const fadeUp = (d = 0) => ({
     initial: { opacity: 0, y: 18 },
@@ -9,164 +12,197 @@ const fadeUp = (d = 0) => ({
 });
 
 const transactions = [
-    { type: 'earn', label: 'Food Donation – Care NGO', coins: '+150', date: 'Today, 2:30 PM', emoji: '🍎' },
-    { type: 'earn', label: 'Laptop Sold – GreenTech', coins: '+200', date: 'Yesterday, 4:15 PM', emoji: '💻' },
-    { type: 'spend', label: 'Purchased Compost Pack', coins: '-80', date: 'Feb 18, 11:00 AM', emoji: '🌱' },
-    { type: 'earn', label: 'Plastic Recycling', coins: '+45', date: 'Feb 17, 9:30 AM', emoji: '♻️' },
-    { type: 'earn', label: 'E-waste to Recycler', coins: '+80', date: 'Feb 15, 3:00 PM', emoji: '🔋' },
-    { type: 'spend', label: 'Eco Bag @ Marketplace', coins: '-120', date: 'Feb 14, 1:20 PM', emoji: '🛍️' },
+    { id: 1, type: 'exchange', text: 'Bid Accepted — Smartphone to GreenTech Recyclers', amount: '+₹520', coins: '+200 🪙', time: '2h ago', emoji: '🏭' },
+    { id: 2, type: 'earn', text: 'Food donated to Care Foundation NGO', amount: null, coins: '+150 🪙', time: '1d ago', emoji: '🍎' },
+    { id: 3, type: 'exchange', text: 'PET Plastic sold via Material Exchange', amount: '+₹190', coins: '+80 🪙', time: '3d ago', emoji: '♻️' },
+    { id: 4, type: 'spend', text: 'Redeemed – Solar Power Bank', amount: null, coins: '-350 🪙', time: '5d ago', emoji: '🔋' },
+    { id: 5, type: 'exchange', text: 'Aluminium cans — bid by CircularTech', amount: '+₹320', coins: '+100 🪙', time: '1w ago', emoji: '🥫' },
+    { id: 6, type: 'earn', text: 'E-Waste recycled (certified pickup)', amount: null, coins: '+80 🪙', time: '1w ago', emoji: '📱' },
+    { id: 7, type: 'spend', text: 'Redeemed – Herb Growing Kit', amount: null, coins: '-150 🪙', time: '2w ago', emoji: '🌿' },
 ];
 
 const redeemOptions = [
-    { label: 'Refurbished Products', desc: 'Electronics at 70% off', icon: '📱', coins: 'From 300' },
-    { label: 'Organic Compost', desc: 'Premium compost bags', icon: '🌿', coins: 'From 80' },
-    { label: 'Eco Product Discounts', desc: 'Up to 50% off eco products', icon: '🏷️', coins: 'From 50' },
-    { label: 'Community Benefits', desc: 'Plant a tree in your name', icon: '🌳', coins: 'From 200' },
+    { name: 'Solar Charger', coins: 300, emoji: '🔋' },
+    { name: 'Eco Tote Bag', coins: 100, emoji: '🛍️' },
+    { name: 'Plant Kit', coins: 150, emoji: '🌱' },
+    { name: 'Bamboo Bottle', coins: 200, emoji: '🍶' },
 ];
 
 export default function WalletPage() {
-    const [tab, setTab] = useState('history');
+    const [filter, setFilter] = useState('all');
+
+    const filtered = filter === 'all'
+        ? transactions
+        : transactions.filter(t => t.type === filter);
 
     return (
         <div className="page-container">
             {/* Balance Card */}
-            <motion.div {...fadeUp(0)} className="card" style={s.balanceCard}>
-                <div style={s.balanceTop}>
-                    <div>
-                        <p style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 500 }}>Total Balance</p>
-                        <div style={s.balanceRow}>
-                            <span style={s.balanceValue}>2,450</span>
-                            <span style={{ fontSize: '1.2rem' }}>🪙</span>
+            <motion.div
+                {...fadeUp(0)}
+                className="card"
+                style={s.balanceCard}
+            >
+                <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Total Balance</p>
+                <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.2, type: 'spring' }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
+                        <span className="gradient-text" style={{ fontSize: '2.4rem', fontWeight: 900 }}>2,450</span>
+                        <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>GreenCoins</span>
+                    </div>
+                </motion.div>
+                <div style={s.statsRow}>
+                    <div style={s.miniStat}>
+                        <ArrowUpRight size={14} color="#10b981" />
+                        <div>
+                            <p style={{ fontWeight: 700, color: '#10b981' }}>+810</p>
+                            <p style={{ fontSize: '0.65rem', color: '#64748b' }}>Earned (30d)</p>
                         </div>
                     </div>
-                    <div style={s.coinIcon}>
-                        <Coins size={28} color="#f59e0b" />
-                    </div>
-                </div>
-                <div style={s.balanceStats}>
-                    <div style={s.statItem}>
-                        <ArrowUpRight size={14} color="#10b981" />
-                        <span style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: 600 }}>+475</span>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b' }}>This month</span>
-                    </div>
-                    <div style={s.statItem}>
-                        <ArrowDownLeft size={14} color="#f87171" />
-                        <span style={{ fontSize: '0.78rem', color: '#f87171', fontWeight: 600 }}>-200</span>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Spent</span>
-                    </div>
-                    <div style={s.statItem}>
-                        <TrendingUp size={14} color="#f59e0b" />
-                        <span style={{ fontSize: '0.78rem', color: '#f59e0b', fontWeight: 600 }}>12%</span>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Growth</span>
+                    <div style={s.miniStat}>
+                        <ArrowDownLeft size={14} color="#f59e0b" />
+                        <div>
+                            <p style={{ fontWeight: 700, color: '#f59e0b' }}>-500</p>
+                            <p style={{ fontSize: '0.65rem', color: '#64748b' }}>Spent (30d)</p>
+                        </div>
                     </div>
                 </div>
             </motion.div>
 
-            {/* Earning Tips */}
-            <motion.div {...fadeUp(0.1)} className="card card-sm" style={{ marginBottom: 18, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: '1.3rem' }}>💡</span>
-                    <div>
-                        <p style={{ fontWeight: 600, fontSize: '0.85rem' }}>Earn More GreenCoins</p>
-                        <p style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 2 }}>Donating food earns the highest rewards – up to 150 coins per donation!</p>
-                    </div>
+            {/* Exchange Earnings */}
+            <motion.div
+                {...fadeUp(0.1)}
+                className="card card-sm"
+                style={{ marginBottom: 16, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                    <Gavel size={16} color="#10b981" />
+                    <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Exchange Earnings</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
+                    {[
+                        { val: '₹1,030', label: 'Total Earned', color: '#10b981' },
+                        { val: '3', label: 'Bids Accepted', color: '#3b82f6' },
+                        { val: '₹520', label: 'Last Payout', color: '#fbbf24' },
+                    ].map((stat, i) => (
+                        <div key={i}>
+                            <span style={{ fontWeight: 800, fontSize: '1rem', color: stat.color }}>{stat.val}</span>
+                            <p style={{ fontSize: '0.65rem', color: '#64748b', marginTop: 2 }}>{stat.label}</p>
+                        </div>
+                    ))}
                 </div>
             </motion.div>
 
-            {/* Tabs */}
-            <motion.div {...fadeUp(0.15)} className="tab-pills" style={{ marginBottom: 16 }}>
-                <button className={`tab-pill ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>
-                    📋 History
-                </button>
-                <button className={`tab-pill ${tab === 'redeem' ? 'active' : ''}`} onClick={() => setTab('redeem')}>
-                    🎁 Redeem
-                </button>
+            {/* Filter Tabs */}
+            <motion.div {...fadeUp(0.15)} style={s.filterRow}>
+                {[
+                    { id: 'all', label: 'All' },
+                    { id: 'exchange', label: '💰 Exchange' },
+                    { id: 'earn', label: '🪙 Earned' },
+                    { id: 'spend', label: '🛒 Spent' },
+                ].map((tab) => (
+                    <button
+                        key={tab.id}
+                        className={`tab-pill ${filter === tab.id ? 'active' : ''}`}
+                        onClick={() => setFilter(tab.id)}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
             </motion.div>
 
-            {tab === 'history' ? (
-                <motion.div {...fadeUp(0.2)}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {transactions.map((tx, i) => (
-                            <motion.div
-                                key={i}
-                                className="list-item"
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: i * 0.05 }}
-                            >
-                                <span style={{ fontSize: '1.4rem' }}>{tx.emoji}</span>
-                                <div style={{ flex: 1 }}>
-                                    <p style={{ fontWeight: 500, fontSize: '0.85rem' }}>{tx.label}</p>
-                                    <p style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 2 }}>{tx.date}</p>
-                                </div>
-                                <span style={{
-                                    fontWeight: 700,
-                                    fontSize: '0.9rem',
-                                    color: tx.type === 'earn' ? '#10b981' : '#f87171',
+            {/* Transactions */}
+            <motion.div {...fadeUp(0.2)}>
+                <div className="section-header">
+                    <span className="section-title">Transaction History</span>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{filtered.length} items</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {filtered.map((tx, i) => (
+                        <motion.div
+                            key={tx.id}
+                            className="list-item"
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: i * 0.04 }}
+                        >
+                            <span style={{ fontSize: '1.5rem' }}>{tx.emoji}</span>
+                            <div style={{ flex: 1 }}>
+                                <p style={{ fontWeight: 500, fontSize: '0.85rem' }}>{tx.text}</p>
+                                <p style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 2 }}>{tx.time}</p>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                {tx.amount && (
+                                    <p style={{ fontWeight: 700, color: '#10b981', fontSize: '0.88rem' }}>{tx.amount}</p>
+                                )}
+                                <p style={{
+                                    fontWeight: 600,
+                                    fontSize: tx.amount ? '0.7rem' : '0.85rem',
+                                    color: tx.type === 'spend' ? '#f59e0b' : '#34d399',
                                 }}>
                                     {tx.coins}
-                                </span>
-                            </motion.div>
-                        ))}
-                    </div>
-                </motion.div>
-            ) : (
-                <motion.div {...fadeUp(0.2)}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {redeemOptions.map((opt, i) => (
-                            <motion.div
-                                key={i}
-                                className="card card-sm"
-                                style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
-                                whileTap={{ scale: 0.98 }}
-                            >
-                                <span style={{ fontSize: '1.6rem' }}>{opt.icon}</span>
-                                <div style={{ flex: 1 }}>
-                                    <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>{opt.label}</p>
-                                    <p style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 2 }}>{opt.desc}</p>
-                                </div>
-                                <div style={{ textAlign: 'right' }}>
-                                    <span className="badge badge-gold">{opt.coins} 🪙</span>
-                                </div>
-                            </motion.div>
-                        ))}
-                    </div>
-                </motion.div>
-            )}
+                                </p>
+                            </div>
+                        </motion.div>
+                    ))}
+                </div>
+            </motion.div>
+
+            {/* Redeem Section */}
+            <motion.div {...fadeUp(0.3)} style={{ marginTop: 20 }}>
+                <div className="section-header">
+                    <span className="section-title">Redeem GreenCoins</span>
+                    <span className="section-link">View all</span>
+                </div>
+                <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
+                    {redeemOptions.map((item, i) => (
+                        <motion.div
+                            key={i}
+                            className="card card-sm"
+                            style={s.redeemCard}
+                            whileTap={{ scale: 0.96 }}
+                        >
+                            <span style={{ fontSize: '2rem' }}>{item.emoji}</span>
+                            <p style={{ fontWeight: 600, fontSize: '0.78rem', marginTop: 6 }}>{item.name}</p>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 6 }}>
+                                <Coins size={12} color="#f59e0b" />
+                                <span style={{ fontWeight: 700, fontSize: '0.82rem', color: '#fbbf24' }}>{item.coins}</span>
+                            </div>
+                        </motion.div>
+                    ))}
+                </div>
+            </motion.div>
         </div>
     );
 }
 
 const s = {
     balanceCard: {
-        background: 'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(217,119,6,0.05))',
-        border: '1px solid rgba(245,158,11,0.2)',
+        textAlign: 'center',
         marginBottom: 16,
+        background: 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(5,150,105,0.04))',
+        border: '1px solid rgba(16,185,129,0.15)',
+        padding: 24,
     },
-    balanceTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' },
-    balanceRow: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 },
-    balanceValue: {
-        fontSize: '2.2rem',
-        fontWeight: 900,
-        background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
-        WebkitBackgroundClip: 'text',
-        WebkitTextFillColor: 'transparent',
-    },
-    coinIcon: {
-        width: 52,
-        height: 52,
-        borderRadius: 16,
-        background: 'rgba(245,158,11,0.15)',
+    statsRow: {
         display: 'flex',
-        alignItems: 'center',
         justifyContent: 'center',
-    },
-    balanceStats: {
-        display: 'flex',
-        gap: 20,
-        marginTop: 18,
-        paddingTop: 14,
+        gap: 30,
+        marginTop: 16,
+        paddingTop: 12,
         borderTop: '1px solid rgba(255,255,255,0.06)',
     },
-    statItem: { display: 'flex', alignItems: 'center', gap: 4 },
+    miniStat: { display: 'flex', alignItems: 'center', gap: 6 },
+    filterRow: {
+        display: 'flex', gap: 6, overflowX: 'auto',
+        paddingBottom: 4, marginBottom: 16,
+    },
+    redeemCard: {
+        minWidth: 110, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', textAlign: 'center', padding: 16,
+        cursor: 'pointer',
+    },
 };

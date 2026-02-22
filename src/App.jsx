@@ -11,7 +11,8 @@ const pageTitles = {
   '/recyclables': 'Recyclables',
   '/wallet': 'GreenCoins',
   '/credit-score': 'Green Score',
-  '/marketplace': 'Eco Store',
+  '/marketplace': 'Material Exchange',
+  '/bidding': 'Live Bidding',
   '/profile': 'Profile',
 };
 

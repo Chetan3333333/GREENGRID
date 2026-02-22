@@ -11,6 +11,7 @@ import RecyclablesPage from './pages/RecyclablesPage.jsx';
 import WalletPage from './pages/WalletPage.jsx';
 import CreditScorePage from './pages/CreditScorePage.jsx';
 import MarketplacePage from './pages/MarketplacePage.jsx';
+import BiddingPage from './pages/BiddingPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import './index.css';
 
@@ -28,6 +29,7 @@ const router = createBrowserRouter([
       { path: 'wallet', element: <WalletPage /> },
       { path: 'credit-score', element: <CreditScorePage /> },
       { path: 'marketplace', element: <MarketplacePage /> },
+      { path: 'bidding', element: <BiddingPage /> },
       { path: 'profile', element: <ProfilePage /> },
       { path: '*', element: <Navigate to="/home" replace /> },
     ],

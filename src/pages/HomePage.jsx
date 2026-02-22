@@ -2,7 +2,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
     Apple, Cpu, Recycle, Coins, TrendingUp,
-    ChevronRight, Leaf, ArrowRight, Sparkles
+    ChevronRight, Leaf, ArrowRight, Sparkles, Gavel,
+    Shield, Package, Users
 } from 'lucide-react';
 
 const fadeUp = (d = 0) => ({
@@ -19,7 +20,7 @@ export default function HomePage() {
             {/* Greeting */}
             <motion.div {...fadeUp(0)} style={s.greeting}>
                 <p style={s.hello}>Hello, <span style={s.name}>Green Hero</span> 🌿</p>
-                <p style={s.subtitle}>What would you like to responsibly manage today?</p>
+                <p style={s.subtitle}>Smart Recycling Exchange — AI-powered circular material recovery</p>
             </motion.div>
 
             {/* Quick Stats */}
@@ -44,7 +45,24 @@ export default function HomePage() {
                 </div>
             </motion.div>
 
-            {/* AI Scan CTA */}
+            {/* Platform Stats */}
+            <motion.div {...fadeUp(0.15)} className="card card-sm" style={{ marginBottom: 16, background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.12)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
+                    {[
+                        { val: '12.4T', label: 'Materials Recovered', icon: Package },
+                        { val: '2.8T', label: 'CO₂ Saved', icon: Leaf },
+                        { val: '340+', label: 'Certified Merchants', icon: Shield },
+                    ].map((stat, i) => (
+                        <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                            <stat.icon size={16} color="#10b981" />
+                            <span style={{ fontWeight: 800, fontSize: '1rem', color: '#34d399' }}>{stat.val}</span>
+                            <span style={{ fontSize: '0.6rem', color: '#64748b', lineHeight: 1.2 }}>{stat.label}</span>
+                        </div>
+                    ))}
+                </div>
+            </motion.div>
+
+            {/* AI Material Evaluator CTA */}
             <motion.div
                 {...fadeUp(0.2)}
                 className="card"
@@ -56,14 +74,14 @@ export default function HomePage() {
                         <Sparkles size={24} color="#fff" />
                     </div>
                     <div>
-                        <h3 style={s.scanTitle}>AI Resource Scanner</h3>
-                        <p style={s.scanDesc}>Upload an item for AI evaluation</p>
+                        <h3 style={s.scanTitle}>AI Material Evaluator</h3>
+                        <p style={s.scanDesc}>Scan → Evaluate → Route to Exchange</p>
                     </div>
                 </div>
                 <ArrowRight size={20} color="#10b981" />
             </motion.div>
 
-            {/* Categories */}
+            {/* Resource Categories */}
             <motion.div {...fadeUp(0.3)}>
                 <div className="section-header">
                     <span className="section-title">Resource Categories</span>
@@ -73,7 +91,7 @@ export default function HomePage() {
                         { icon: Apple, label: 'Food &\nOrganics', color: '#10b981', bg: 'rgba(16,185,129,0.12)', to: '/food' },
                         { icon: Cpu, label: 'Electronics\n& E-Waste', color: '#3b82f6', bg: 'rgba(59,130,246,0.12)', to: '/electronics' },
                         { icon: Recycle, label: 'Recyclable\nMaterials', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', to: '/recyclables' },
-                    ].map((cat, i) => (
+                    ].map((cat) => (
                         <motion.div
                             key={cat.label}
                             className="card card-sm"
@@ -91,6 +109,38 @@ export default function HomePage() {
                 </div>
             </motion.div>
 
+            {/* Live Bids Section */}
+            <motion.div {...fadeUp(0.35)}>
+                <div className="section-header" style={{ marginTop: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className="section-title">Live Bids</span>
+                        <motion.div animate={{ opacity: [1, 0.4, 1] }} transition={{ repeat: Infinity, duration: 1.5 }} style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444' }} />
+                    </div>
+                    <span className="section-link" onClick={() => navigate('/bidding')}>View All</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {[
+                        { item: '📱 Smartphone (E-Waste)', bids: 5, highest: '₹550', time: '18 min left' },
+                        { item: '🧴 PET Plastic 3kg', bids: 3, highest: '₹190', time: '42 min left' },
+                        { item: '💻 Laptop Motherboard', bids: 7, highest: '₹1,200', time: '8 min left' },
+                    ].map((bid, i) => (
+                        <motion.div
+                            key={i}
+                            className="list-item"
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => navigate('/bidding')}
+                            whileTap={{ scale: 0.98 }}
+                        >
+                            <span style={{ fontSize: '0.85rem' }}>{bid.item}</span>
+                            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{bid.bids} bids</span>
+                                <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#10b981' }}>{bid.highest}</span>
+                            </div>
+                        </motion.div>
+                    ))}
+                </div>
+            </motion.div>
+
             {/* Quick Actions */}
             <motion.div {...fadeUp(0.4)}>
                 <div className="section-header" style={{ marginTop: 8 }}>
@@ -98,9 +148,10 @@ export default function HomePage() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {[
-                        { icon: Coins, label: 'GreenCoins Wallet', desc: 'Earn & spend eco rewards', to: '/wallet', color: '#f59e0b' },
-                        { icon: TrendingUp, label: 'Green Credit Score', desc: 'Track your sustainability rating', to: '/credit-score', color: '#10b981' },
-                        { icon: Leaf, label: 'Eco Marketplace', desc: 'Shop with GreenCoins', to: '/marketplace', color: '#34d399' },
+                        { icon: Gavel, label: 'Material Exchange', desc: 'View live recycler bids', to: '/bidding', color: '#f59e0b' },
+                        { icon: Coins, label: 'GreenCoins Wallet', desc: 'Earn & spend eco rewards', to: '/wallet', color: '#10b981' },
+                        { icon: TrendingUp, label: 'Green Credit Score', desc: 'Track your sustainability rating', to: '/credit-score', color: '#3b82f6' },
+                        { icon: Leaf, label: 'Circular Marketplace', desc: 'Shop with GreenCoins', to: '/marketplace', color: '#34d399' },
                     ].map((item) => (
                         <motion.div
                             key={item.label}
@@ -130,9 +181,9 @@ export default function HomePage() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {[
-                        { emoji: '🍎', text: 'Donated 5kg food to Care NGO', coins: '+120', time: '2h ago' },
-                        { emoji: '📱', text: 'Sold old laptop to GreenMerch', coins: '+85', time: '1d ago' },
-                        { emoji: '♻️', text: 'Recycled 3kg plastic bottles', coins: '+45', time: '3d ago' },
+                        { emoji: '🏭', text: 'Bid accepted — Smartphone to GreenTech', coins: '+₹520', time: '2h ago', type: 'exchange' },
+                        { emoji: '🍎', text: 'Donated 5kg food to Care NGO', coins: '+120 🪙', time: '1d ago', type: 'donate' },
+                        { emoji: '♻️', text: 'PET Plastic sold via exchange', coins: '+₹190', time: '3d ago', type: 'exchange' },
                     ].map((act, i) => (
                         <div key={i} className="list-item" style={{ opacity: 1 - i * 0.15 }}>
                             <span style={{ fontSize: '1.5rem' }}>{act.emoji}</span>
@@ -140,7 +191,7 @@ export default function HomePage() {
                                 <div style={{ fontWeight: 500, fontSize: '0.85rem' }}>{act.text}</div>
                                 <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{act.time}</div>
                             </div>
-                            <span className="badge badge-green">{act.coins} 🪙</span>
+                            <span className={`badge ${act.type === 'exchange' ? 'badge-green' : 'badge-gold'}`}>{act.coins}</span>
                         </div>
                     ))}
                 </div>
@@ -153,41 +204,25 @@ const s = {
     greeting: { marginBottom: 18 },
     hello: { fontSize: '1.4rem', fontWeight: 700 },
     name: { color: '#34d399' },
-    subtitle: { fontSize: '0.85rem', color: '#94a3b8', marginTop: 4 },
-    statsRow: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 },
+    subtitle: { fontSize: '0.82rem', color: '#94a3b8', marginTop: 4 },
+    statsRow: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 },
     statCard: { display: 'flex', alignItems: 'center', gap: 12 },
     statIcon: { width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' },
     scanCta: {
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 20,
-        cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, cursor: 'pointer',
         background: 'linear-gradient(135deg, rgba(16,185,129,0.12), rgba(5,150,105,0.06))',
         border: '1px solid rgba(16,185,129,0.2)',
     },
     scanLeft: { display: 'flex', alignItems: 'center', gap: 14 },
     scanIcon: {
-        width: 48,
-        height: 48,
-        borderRadius: 14,
+        width: 48, height: 48, borderRadius: 14,
         background: 'linear-gradient(135deg, #10b981, #059669)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
     },
     scanTitle: { fontWeight: 700, fontSize: '1rem' },
     scanDesc: { fontSize: '0.78rem', color: '#94a3b8', marginTop: 2 },
     categories: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 10 },
-    catCard: {
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 8,
-        textAlign: 'center',
-        cursor: 'pointer',
-        padding: 16,
-    },
+    catCard: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, textAlign: 'center', cursor: 'pointer', padding: 16 },
     catIcon: { width: 52, height: 52, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' },
     catLabel: { fontSize: '0.72rem', fontWeight: 600, whiteSpace: 'pre-line', lineHeight: 1.3, color: '#cbd5e1' },
 };

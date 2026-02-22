@@ -38,7 +38,7 @@ export default function SplashPage() {
                 transition={{ delay: 0.7, duration: 0.5 }}
                 style={styles.tagline}
             >
-                AI-Powered Waste Decision Platform
+                Smart Recycling Exchange
             </motion.p>
 
             <motion.div
@@ -56,7 +56,7 @@ export default function SplashPage() {
                 transition={{ delay: 1.5 }}
                 style={styles.sub}
             >
-                Every resource deserves a second life
+                AI-Powered Circular Material Recovery
             </motion.p>
         </div>
     );
