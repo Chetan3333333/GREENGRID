@@ -34,7 +34,22 @@ export default function ProfilePage() {
             <motion.div {...fadeUp(0)} className="card" style={s.profileCard}>
                 <div style={s.avatarRow}>
                     <div style={s.avatar}>
-                        <User size={32} color="#10b981" />
+                        <svg width="40" height="40" viewBox="0 0 100 100" fill="none">
+                            {/* Tree trunk */}
+                            <rect x="44" y="55" width="12" height="28" rx="3" fill="#7c5c3c" />
+                            <rect x="46" y="57" width="4" height="24" rx="2" fill="#9a7b5a" opacity="0.5" />
+                            {/* Tree crown layers */}
+                            <ellipse cx="50" cy="42" rx="28" ry="24" fill="#059669" />
+                            <ellipse cx="50" cy="38" rx="24" ry="20" fill="#10b981" />
+                            <ellipse cx="50" cy="34" rx="18" ry="16" fill="#34d399" />
+                            <ellipse cx="50" cy="30" rx="12" ry="11" fill="#6ee7b7" />
+                            {/* Leaf highlights */}
+                            <circle cx="38" cy="36" r="3" fill="#a7f3d0" opacity="0.6" />
+                            <circle cx="55" cy="28" r="2" fill="#a7f3d0" opacity="0.5" />
+                            <circle cx="45" cy="44" r="2.5" fill="#a7f3d0" opacity="0.4" />
+                            {/* Ground */}
+                            <ellipse cx="50" cy="84" rx="22" ry="4" fill="#064e3b" opacity="0.3" />
+                        </svg>
                     </div>
                     <div style={{ flex: 1 }}>
                         <h3 style={{ fontWeight: 700, fontSize: '1.15rem' }}>Green Hero</h3>
