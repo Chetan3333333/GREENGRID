@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import {
     Apple, Cpu, Recycle, Coins, TrendingUp,
     ChevronRight, Leaf, ArrowRight, Sparkles, Gavel,
-    Shield, Package, Users
+    Shield, Package, Users, Bot
 } from 'lucide-react';
 
 const fadeUp = (d = 0) => ({
@@ -106,6 +106,23 @@ export default function HomePage() {
                             <ChevronRight size={16} color="#475569" style={{ marginTop: 6 }} />
                         </motion.div>
                     ))}
+                </div>
+            </motion.div>
+
+            {/* AI Chatbot CTA */}
+            <motion.div {...fadeUp(0.32)}>
+                <div className="card" style={{ cursor: 'pointer', background: 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(59,130,246,0.06))', border: '1px solid rgba(139,92,246,0.15)' }} onClick={() => navigate('/chatbot')}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                        <div className="icon-circle" style={{ background: 'rgba(139,92,246,0.12)' }}>
+                            <Bot size={24} color="#8b5cf6" />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <p style={{ fontWeight: 700, fontSize: '0.95rem' }}>AI Assistant</p>
+                            <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: 2 }}>Test products & ask doubts</p>
+                        </div>
+                        <span className="badge" style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)', fontSize: '0.65rem' }}>✨ NEW</span>
+                        <ChevronRight size={16} color="#8b5cf6" />
+                    </div>
                 </div>
             </motion.div>
 

@@ -13,6 +13,7 @@ import CreditScorePage from './pages/CreditScorePage.jsx';
 import MarketplacePage from './pages/MarketplacePage.jsx';
 import BiddingPage from './pages/BiddingPage.jsx';
 import DirectDealPage from './pages/DirectDealPage.jsx';
+import ChatbotPage from './pages/ChatbotPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import './index.css';
 
@@ -32,6 +33,7 @@ const router = createBrowserRouter([
       { path: 'marketplace', element: <MarketplacePage /> },
       { path: 'bidding', element: <BiddingPage /> },
       { path: 'direct-deal', element: <DirectDealPage /> },
+      { path: 'chatbot', element: <ChatbotPage /> },
       { path: 'profile', element: <ProfilePage /> },
       { path: '*', element: <Navigate to="/home" replace /> },
     ],

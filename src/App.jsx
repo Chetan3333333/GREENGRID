@@ -14,6 +14,7 @@ const pageTitles = {
   '/marketplace': 'Material Exchange',
   '/bidding': 'Live Bidding',
   '/direct-deal': 'Smart Deal',
+  '/chatbot': 'GreenGrid AI',
   '/profile': 'Profile',
 };
 

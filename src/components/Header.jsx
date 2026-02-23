@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Bell, ChevronLeft } from 'lucide-react';
 
-const backPages = ['/food', '/electronics', '/recyclables', '/marketplace', '/bidding', '/direct-deal'];
+const backPages = ['/food', '/electronics', '/recyclables', '/marketplace', '/bidding', '/direct-deal', '/chatbot'];
 
 export default function Header({ title }) {
     const navigate = useNavigate();
