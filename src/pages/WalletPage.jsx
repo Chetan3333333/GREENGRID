@@ -1,25 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
     Wallet, TrendingUp, TrendingDown, Coins, Gift,
-    ChevronRight, ArrowUpRight, ArrowDownLeft, Gavel, Leaf
+    ChevronRight, ArrowUpRight, ArrowDownLeft, Gavel, Leaf, Loader2
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { getUserTransactions } from '../services/database';
 
 const fadeUp = (d = 0) => ({
     initial: { opacity: 0, y: 18 },
     animate: { opacity: 1, y: 0 },
     transition: { delay: d, duration: 0.4 },
 });
-
-const transactions = [
-    { id: 1, type: 'exchange', text: 'Bid Accepted — Smartphone to GreenTech Recyclers', amount: '+₹520', coins: '+200 🪙', time: '2h ago', emoji: '🏭' },
-    { id: 2, type: 'earn', text: 'Food donated to Care Foundation NGO', amount: null, coins: '+150 🪙', time: '1d ago', emoji: '🍎' },
-    { id: 3, type: 'exchange', text: 'PET Plastic sold via Material Exchange', amount: '+₹190', coins: '+80 🪙', time: '3d ago', emoji: '♻️' },
-    { id: 4, type: 'spend', text: 'Redeemed – Solar Power Bank', amount: null, coins: '-350 🪙', time: '5d ago', emoji: '🔋' },
-    { id: 5, type: 'exchange', text: 'Aluminium cans — bid by CircularTech', amount: '+₹320', coins: '+100 🪙', time: '1w ago', emoji: '🥫' },
-    { id: 6, type: 'earn', text: 'E-Waste recycled (certified pickup)', amount: null, coins: '+80 🪙', time: '1w ago', emoji: '📱' },
-    { id: 7, type: 'spend', text: 'Redeemed – Herb Growing Kit', amount: null, coins: '-150 🪙', time: '2w ago', emoji: '🌿' },
-];
 
 const redeemOptions = [
     { name: 'Solar Charger', coins: 300, emoji: '🔋' },
@@ -28,8 +20,55 @@ const redeemOptions = [
     { name: 'Bamboo Bottle', coins: 200, emoji: '🍶' },
 ];
 
+function timeAgo(dateStr) {
+    const now = new Date();
+    const date = new Date(dateStr);
+    const diff = Math.floor((now - date) / 1000);
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+    return `${Math.floor(diff / 604800)}w ago`;
+}
+
 export default function WalletPage() {
+    const { currentUser, userProfile } = useAuth();
     const [filter, setFilter] = useState('all');
+    const [transactions, setTransactions] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    const greenCoins = userProfile?.greenCoins ?? 0;
+
+    // Fetch transactions from database
+    useEffect(() => {
+        async function loadTransactions() {
+            if (!currentUser) return;
+            setLoading(true);
+            try {
+                const txs = await getUserTransactions(currentUser.uid);
+                setTransactions(txs);
+            } catch (err) {
+                console.error('Failed to load transactions:', err);
+            }
+            setLoading(false);
+        }
+        loadTransactions();
+    }, [currentUser]);
+
+    // Calculate stats from real transactions
+    const earned30d = transactions
+        .filter(t => t.type === 'earn' && new Date(t.createdAt) > new Date(Date.now() - 30 * 86400000))
+        .reduce((sum, t) => sum + (t.coins || 0), 0);
+
+    const spent30d = transactions
+        .filter(t => t.type === 'spend' && new Date(t.createdAt) > new Date(Date.now() - 30 * 86400000))
+        .reduce((sum, t) => sum + Math.abs(t.coins || 0), 0);
+
+    const exchangeTotal = transactions
+        .filter(t => t.type === 'exchange')
+        .reduce((sum, t) => sum + (t.coins || 0), 0);
+
+    const exchangeCount = transactions.filter(t => t.type === 'exchange').length;
 
     const filtered = filter === 'all'
         ? transactions
@@ -50,7 +89,9 @@ export default function WalletPage() {
                     transition={{ delay: 0.2, type: 'spring' }}
                 >
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
-                        <span className="gradient-text" style={{ fontSize: '2.4rem', fontWeight: 900 }}>2,450</span>
+                        <span className="gradient-text" style={{ fontSize: '2.4rem', fontWeight: 900 }}>
+                            {greenCoins.toLocaleString()}
+                        </span>
                         <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>GreenCoins</span>
                     </div>
                 </motion.div>
@@ -58,14 +99,14 @@ export default function WalletPage() {
                     <div style={s.miniStat}>
                         <ArrowUpRight size={14} color="#10b981" />
                         <div>
-                            <p style={{ fontWeight: 700, color: '#10b981' }}>+810</p>
+                            <p style={{ fontWeight: 700, color: '#10b981' }}>+{earned30d}</p>
                             <p style={{ fontSize: '0.65rem', color: '#64748b' }}>Earned (30d)</p>
                         </div>
                     </div>
                     <div style={s.miniStat}>
                         <ArrowDownLeft size={14} color="#f59e0b" />
                         <div>
-                            <p style={{ fontWeight: 700, color: '#f59e0b' }}>-500</p>
+                            <p style={{ fontWeight: 700, color: '#f59e0b' }}>-{spent30d}</p>
                             <p style={{ fontSize: '0.65rem', color: '#64748b' }}>Spent (30d)</p>
                         </div>
                     </div>
@@ -84,9 +125,9 @@ export default function WalletPage() {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
                     {[
-                        { val: '₹1,030', label: 'Total Earned', color: '#10b981' },
-                        { val: '3', label: 'Bids Accepted', color: '#3b82f6' },
-                        { val: '₹520', label: 'Last Payout', color: '#fbbf24' },
+                        { val: `${exchangeTotal}`, label: 'Coins Earned', color: '#10b981' },
+                        { val: `${exchangeCount}`, label: 'Exchanges', color: '#3b82f6' },
+                        { val: `${transactions.length}`, label: 'Total Txns', color: '#fbbf24' },
                     ].map((stat, i) => (
                         <div key={i}>
                             <span style={{ fontWeight: 800, fontSize: '1rem', color: stat.color }}>{stat.val}</span>
@@ -120,35 +161,50 @@ export default function WalletPage() {
                     <span className="section-title">Transaction History</span>
                     <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{filtered.length} items</span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {filtered.map((tx, i) => (
-                        <motion.div
-                            key={tx.id}
-                            className="list-item"
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: i * 0.04 }}
-                        >
-                            <span style={{ fontSize: '1.5rem' }}>{tx.emoji}</span>
-                            <div style={{ flex: 1 }}>
-                                <p style={{ fontWeight: 500, fontSize: '0.85rem' }}>{tx.text}</p>
-                                <p style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 2 }}>{tx.time}</p>
-                            </div>
-                            <div style={{ textAlign: 'right' }}>
-                                {tx.amount && (
-                                    <p style={{ fontWeight: 700, color: '#10b981', fontSize: '0.88rem' }}>{tx.amount}</p>
-                                )}
-                                <p style={{
-                                    fontWeight: 600,
-                                    fontSize: tx.amount ? '0.7rem' : '0.85rem',
-                                    color: tx.type === 'spend' ? '#f59e0b' : '#34d399',
-                                }}>
-                                    {tx.coins}
-                                </p>
-                            </div>
-                        </motion.div>
-                    ))}
-                </div>
+
+                {loading ? (
+                    <div style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>
+                        <Loader2 size={24} style={{ animation: 'spin 1s linear infinite' }} />
+                        <p style={{ marginTop: 8, fontSize: '0.85rem' }}>Loading transactions...</p>
+                        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                    </div>
+                ) : filtered.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>
+                        <p style={{ fontSize: '1.5rem', marginBottom: 8 }}>🪙</p>
+                        <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>No transactions yet</p>
+                        <p style={{ fontSize: '0.78rem', marginTop: 4 }}>Scan an item to start earning GreenCoins!</p>
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {filtered.map((tx, i) => (
+                            <motion.div
+                                key={tx.id}
+                                className="list-item"
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: i * 0.04 }}
+                            >
+                                <span style={{ fontSize: '1.5rem' }}>{tx.emoji || '🪙'}</span>
+                                <div style={{ flex: 1 }}>
+                                    <p style={{ fontWeight: 500, fontSize: '0.85rem' }}>{tx.reason}</p>
+                                    <p style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 2 }}>{timeAgo(tx.createdAt)}</p>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                    {tx.amount && (
+                                        <p style={{ fontWeight: 700, color: '#10b981', fontSize: '0.88rem' }}>{tx.amount}</p>
+                                    )}
+                                    <p style={{
+                                        fontWeight: 600,
+                                        fontSize: tx.amount ? '0.7rem' : '0.85rem',
+                                        color: tx.type === 'spend' ? '#f59e0b' : '#34d399',
+                                    }}>
+                                        {tx.type === 'spend' ? `-${Math.abs(tx.coins)}` : `+${tx.coins}`} 🪙
+                                    </p>
+                                </div>
+                            </motion.div>
+                        ))}
+                    </div>
+                )}
             </motion.div>
 
             {/* Redeem Section */}

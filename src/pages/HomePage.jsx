@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -5,6 +6,8 @@ import {
     ChevronRight, Leaf, ArrowRight, Sparkles, Gavel,
     Shield, Package, Users, Bot
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { getUserTransactions, calculateGreenScore } from '../services/database';
 
 const fadeUp = (d = 0) => ({
     initial: { opacity: 0, y: 18 },
@@ -14,12 +17,32 @@ const fadeUp = (d = 0) => ({
 
 export default function HomePage() {
     const navigate = useNavigate();
+    const { currentUser, userProfile } = useAuth();
+    const [recentActivity, setRecentActivity] = useState([]);
+
+    const displayName = userProfile?.name || currentUser?.displayName || 'Green Hero';
+    const greenCoins = userProfile?.greenCoins ?? 0;
+    const greenScore = calculateGreenScore(userProfile);
+
+    // Load recent transactions for Recent Activity section
+    useEffect(() => {
+        async function loadRecent() {
+            if (!currentUser) return;
+            try {
+                const txs = await getUserTransactions(currentUser.uid);
+                setRecentActivity(txs.slice(0, 5));
+            } catch (err) {
+                console.error('Failed to load activity:', err);
+            }
+        }
+        loadRecent();
+    }, [currentUser, userProfile]);
 
     return (
         <div className="page-container">
             {/* Greeting */}
             <motion.div {...fadeUp(0)} style={s.greeting}>
-                <p style={s.hello}>Hello, <span style={s.name}>Green Hero</span> 🌿</p>
+                <p style={s.hello}>Hello, <span style={s.name}>{displayName}</span> 🌿</p>
                 <p style={s.subtitle}>Smart Recycling Exchange — AI-powered circular material recovery</p>
             </motion.div>
 
@@ -30,7 +53,7 @@ export default function HomePage() {
                         <Coins size={18} color="#10b981" />
                     </div>
                     <div>
-                        <div className="stat-value gradient-text" style={{ fontSize: '1.3rem' }}>2,450</div>
+                        <div className="stat-value gradient-text" style={{ fontSize: '1.3rem' }}>{greenCoins.toLocaleString()}</div>
                         <div className="stat-label">GreenCoins</div>
                     </div>
                 </div>
@@ -39,7 +62,7 @@ export default function HomePage() {
                         <TrendingUp size={18} color="#f59e0b" />
                     </div>
                     <div>
-                        <div className="stat-value gradient-gold-text" style={{ fontSize: '1.3rem' }}>782</div>
+                        <div className="stat-value gradient-gold-text" style={{ fontSize: '1.3rem' }}>{greenScore}</div>
                         <div className="stat-label">Green Score</div>
                     </div>
                 </div>
@@ -165,20 +188,26 @@ export default function HomePage() {
                     <span className="section-link">View all</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {[
-                        { emoji: '🏭', text: 'Bid accepted — Smartphone to GreenTech', coins: '+₹520', time: '2h ago', type: 'exchange' },
-                        { emoji: '🍎', text: 'Donated 5kg food to Care NGO', coins: '+120 🪙', time: '1d ago', type: 'donate' },
-                        { emoji: '♻️', text: 'PET Plastic sold via exchange', coins: '+₹190', time: '3d ago', type: 'exchange' },
-                    ].map((act, i) => (
-                        <div key={i} className="list-item" style={{ opacity: 1 - i * 0.15 }}>
-                            <span style={{ fontSize: '1.5rem' }}>{act.emoji}</span>
-                            <div style={{ flex: 1 }}>
-                                <div style={{ fontWeight: 500, fontSize: '0.85rem' }}>{act.text}</div>
-                                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{act.time}</div>
-                            </div>
-                            <span className={`badge ${act.type === 'exchange' ? 'badge-green' : 'badge-gold'}`}>{act.coins}</span>
+                    {recentActivity.length === 0 ? (
+                        <div className="list-item" style={{ textAlign: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.85rem' }}>
+                            No activity yet — scan an item to get started! 🌿
                         </div>
-                    ))}
+                    ) : (
+                        recentActivity.map((tx, i) => (
+                            <div key={tx.id} className="list-item" style={{ opacity: 1 - i * 0.1 }}>
+                                <span style={{ fontSize: '1.5rem' }}>{tx.emoji || '🪙'}</span>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontWeight: 500, fontSize: '0.85rem' }}>{tx.reason}</div>
+                                    <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                        {new Date(tx.createdAt).toLocaleDateString()}
+                                    </div>
+                                </div>
+                                <span className={`badge ${tx.type === 'spend' ? 'badge-gold' : 'badge-green'}`}>
+                                    {tx.type === 'spend' ? `-${Math.abs(tx.coins)}` : `+${tx.coins}`} 🪙
+                                </span>
+                            </div>
+                        ))
+                    )}
                 </div>
             </motion.div>
         </div>

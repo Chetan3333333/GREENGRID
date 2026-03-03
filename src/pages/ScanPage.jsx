@@ -2,10 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Camera, Upload, Apple, Cpu, Recycle, CheckCircle, ArrowRight,
-    Loader2, Sparkles, X, AlertTriangle, TrendingUp, Shield, Gavel
+    Loader2, Sparkles, X, AlertTriangle, TrendingUp, Shield, Gavel, Save
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { useAuth } from '../contexts/AuthContext';
+import { saveItem } from '../services/database';
 
 // Initialize Gemini API
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || '');
@@ -25,12 +27,15 @@ const analyzeSteps = [
 
 export default function ScanPage() {
     const navigate = useNavigate();
+    const { currentUser, fetchUserProfile } = useAuth();
     const [step, setStep] = useState('upload'); // upload, analyzing, result
     const [selectedCat, setSelectedCat] = useState(null);
     const [hasImage, setHasImage] = useState(false);
     const [analyzeStep, setAnalyzeStep] = useState(0);
     const [aiResult, setAiResult] = useState(null);
     const [errorMsg, setErrorMsg] = useState('');
+    const [savedItem, setSavedItem] = useState(null);
+    const [isSaving, setIsSaving] = useState(false);
 
     // Camera state
     const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -154,6 +159,23 @@ export default function ScanPage() {
             setAnalyzeStep(4);
             setAiResult(parsedResult);
 
+            // Save item to database
+            if (currentUser) {
+                setIsSaving(true);
+                try {
+                    const saved = await saveItem(currentUser.uid, {
+                        ...parsedResult,
+                        category: selectedCat,
+                    });
+                    setSavedItem(saved);
+                    // Refresh user profile to get updated coins
+                    await fetchUserProfile(currentUser.uid);
+                } catch (saveErr) {
+                    console.error('Failed to save item:', saveErr);
+                }
+                setIsSaving(false);
+            }
+
             // Short delay to show 100% completion before switching cards
             setTimeout(() => {
                 setStep('result');
@@ -174,6 +196,8 @@ export default function ScanPage() {
         setCapturedImageUrl(null);
         setAiResult(null);
         setErrorMsg('');
+        setSavedItem(null);
+        setIsSaving(false);
     };
 
     return (
@@ -420,7 +444,9 @@ export default function ScanPage() {
                             <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🪙</div>
                             <div style={{ flex: 1 }}>
                                 <p style={{ fontWeight: 600, fontSize: '0.85rem' }}>GreenCoins Reward</p>
-                                <p style={{ fontSize: '0.72rem', color: '#64748b' }}>Earned for responsible disposal</p>
+                                <p style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                                    {savedItem ? '✅ Saved & credited to your wallet!' : isSaving ? 'Saving to your wallet...' : 'Earned for responsible disposal'}
+                                </p>
                             </div>
                             <span className="badge badge-gold">{aiResult.coins}</span>
                         </div>

@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
     ShoppingBag, Search, Coins, Star, Leaf, Gavel,
-    TrendingUp, Shield, Package, ChevronRight, Timer
+    TrendingUp, Shield, Package, ChevronRight, Timer, Loader2
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { listenToItems } from '../services/database';
 
 const fadeUp = (d = 0) => ({
     initial: { opacity: 0, y: 18 },
@@ -25,19 +27,36 @@ const products = [
     { name: 'Organic Seeds Pack', price: 65, rating: 4.7, cat: 'Garden', emoji: '🌰', tag: 'New' },
 ];
 
-const exchangeListings = [
-    { item: '📱 Smartphone (E-Waste)', bids: 5, highest: '₹550', time: '18 min', seller: 'Rahul M.' },
-    { item: '🧴 PET Plastic 3kg', bids: 3, highest: '₹190', time: '42 min', seller: 'Priya S.' },
-    { item: '💻 Laptop Motherboard', bids: 7, highest: '₹1,200', time: '8 min', seller: 'Ankit K.' },
-    { item: '🥫 Aluminium Cans 5kg', bids: 4, highest: '₹320', time: '55 min', seller: 'Neha R.' },
-    { item: '📦 Cardboard Bales 10kg', bids: 2, highest: '₹180', time: '1h 20m', seller: 'Vikram P.' },
-];
+function timeAgo(dateStr) {
+    const now = new Date();
+    const date = new Date(dateStr);
+    const diff = Math.floor((now - date) / 1000);
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)} min`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+}
 
 export default function MarketplacePage() {
     const [tab, setTab] = useState('exchange');
     const [selectedCat, setSelectedCat] = useState('All');
     const [search, setSearch] = useState('');
+    const [liveItems, setLiveItems] = useState([]);
+    const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
+    const { userProfile } = useAuth();
+
+    const greenCoins = userProfile?.greenCoins ?? 0;
+
+    // Listen for real-time items from the database
+    useEffect(() => {
+        setLoading(true);
+        const unsubscribe = listenToItems((items) => {
+            setLiveItems(items);
+            setLoading(false);
+        });
+        return unsubscribe;
+    }, []);
 
     const filtered = products.filter(p => {
         if (selectedCat !== 'All' && p.cat !== selectedCat) return false;
@@ -70,16 +89,16 @@ export default function MarketplacePage() {
                 </button>
             </motion.div>
 
-            {/* Material Exchange Tab */}
+            {/* Material Exchange Tab — NOW WITH REAL DATA */}
             {tab === 'exchange' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                     {/* Stat Banner */}
                     <div className="card card-sm" style={{ marginBottom: 14, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
                             {[
-                                { val: '23', label: 'Active Listings' },
-                                { val: '87', label: 'Bids Today' },
-                                { val: '₹12.4K', label: 'Recovered Today' },
+                                { val: String(liveItems.length), label: 'Total Listings' },
+                                { val: String(liveItems.filter(i => i.status === 'scanned').length), label: 'New Scans' },
+                                { val: String(liveItems.filter(i => i.aiAnalysis?.route === 'bidding').length), label: 'For Bidding' },
                             ].map((stat, i) => (
                                 <div key={i}>
                                     <span style={{ fontWeight: 800, fontSize: '1.1rem', color: '#fbbf24' }}>{stat.val}</span>
@@ -97,37 +116,69 @@ export default function MarketplacePage() {
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {exchangeListings.map((listing, i) => (
-                            <motion.div
-                                key={i}
-                                className="card card-sm"
-                                style={{ cursor: 'pointer' }}
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: i * 0.05 }}
-                                onClick={() => navigate('/bidding')}
-                                whileTap={{ scale: 0.98 }}
-                            >
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <div style={{ flex: 1 }}>
-                                        <p style={{ fontWeight: 600, fontSize: '0.88rem' }}>{listing.item}</p>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
-                                            <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{listing.bids} bids</span>
-                                            <span style={{ fontSize: '0.7rem', color: '#64748b' }}>by {listing.seller}</span>
-                                            <span style={{ fontSize: '0.7rem', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 3 }}>
-                                                <Timer size={10} /> {listing.time}
-                                            </span>
+                    {loading ? (
+                        <div style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>
+                            <Loader2 size={24} style={{ animation: 'spin 1s linear infinite' }} />
+                            <p style={{ marginTop: 8, fontSize: '0.85rem' }}>Loading listings...</p>
+                            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                        </div>
+                    ) : liveItems.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>
+                            <p style={{ fontSize: '2rem', marginBottom: 8 }}>📦</p>
+                            <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>No listings yet</p>
+                            <p style={{ fontSize: '0.78rem', marginTop: 4 }}>Scan an item to create the first listing!</p>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {liveItems.map((item, i) => (
+                                <motion.div
+                                    key={item.id}
+                                    className="card card-sm"
+                                    style={{ cursor: 'pointer' }}
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: i * 0.05 }}
+                                    onClick={() => navigate('/bidding')}
+                                    whileTap={{ scale: 0.98 }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <div style={{ flex: 1 }}>
+                                            <p style={{ fontWeight: 600, fontSize: '0.88rem' }}>
+                                                {item.aiAnalysis?.icon || '📦'} {item.title}
+                                            </p>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                                                <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                                    {item.category || 'general'}
+                                                </span>
+                                                <span style={{
+                                                    fontSize: '0.65rem',
+                                                    padding: '2px 6px',
+                                                    borderRadius: 4,
+                                                    background: item.status === 'scanned' ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
+                                                    color: item.status === 'scanned' ? '#10b981' : '#f59e0b',
+                                                }}>
+                                                    {item.status}
+                                                </span>
+                                                <span style={{ fontSize: '0.7rem', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 3 }}>
+                                                    <Timer size={10} /> {timeAgo(item.createdAt)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div style={{ textAlign: 'right' }}>
+                                            {item.aiAnalysis?.recoveryValue && (
+                                                <p style={{ fontWeight: 800, color: '#10b981', fontSize: '0.9rem' }}>
+                                                    {item.aiAnalysis.recoveryValue}
+                                                </p>
+                                            )}
+                                            <p style={{ fontSize: '0.6rem', color: '#64748b' }}>
+                                                {item.aiAnalysis?.route === 'bidding' ? 'for bidding' : 'for donation'}
+                                            </p>
                                         </div>
                                     </div>
-                                    <div style={{ textAlign: 'right' }}>
-                                        <p style={{ fontWeight: 800, color: '#10b981', fontSize: '1rem' }}>{listing.highest}</p>
-                                        <p style={{ fontSize: '0.6rem', color: '#64748b' }}>highest bid</p>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        ))}
-                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
+                    )}
 
                     <button className="btn btn-primary btn-lg" style={{ width: '100%', marginTop: 16 }} onClick={() => navigate('/scan')}>
                         <Package size={16} /> List Your Material
@@ -135,14 +186,14 @@ export default function MarketplacePage() {
                 </motion.div>
             )}
 
-            {/* Eco Shop Tab */}
+            {/* Eco Shop Tab — Static products (will connect later) */}
             {tab === 'shop' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                     {/* Balance Banner */}
                     <div className="card card-sm" style={s.balanceBanner}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <Coins size={18} color="#f59e0b" />
-                            <span style={{ fontWeight: 700, color: '#fbbf24' }}>2,450</span>
+                            <span style={{ fontWeight: 700, color: '#fbbf24' }}>{greenCoins.toLocaleString()}</span>
                             <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>GreenCoins available</span>
                         </div>
                     </div>
