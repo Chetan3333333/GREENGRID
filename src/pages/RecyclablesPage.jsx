@@ -3,8 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
     Recycle, Package, ChevronRight, Truck, MapPin, Gavel,
-    TrendingUp, Shield, Star, Timer, Handshake
+    TrendingUp, Shield, Star, Timer, Handshake, CheckCircle, Loader2
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { addTransaction, updateUserStats } from '../services/database';
 
 const fadeUp = (d = 0) => ({
     initial: { opacity: 0, y: 18 },
@@ -68,6 +70,23 @@ export default function RecyclablesPage() {
     const [expandedBid, setExpandedBid] = useState(null);
     const navigate = useNavigate();
     const mat = materials.find(m => m.id === selected);
+    const { currentUser, fetchUserProfile } = useAuth();
+    const [actionLoading, setActionLoading] = useState(null);
+    const [actionDone, setActionDone] = useState([]);
+
+    async function handleAction(label, coins, emoji, index) {
+        if (!currentUser || actionLoading !== null || actionDone.includes(index)) return;
+        setActionLoading(index);
+        try {
+            await addTransaction(currentUser.uid, {
+                type: 'earn', coins, reason: label, emoji,
+            });
+            await updateUserStats(currentUser.uid, { greenCoins: coins, itemsRecycled: 1 });
+            await fetchUserProfile(currentUser.uid);
+            setActionDone(prev => [...prev, index]);
+        } catch (err) { console.error(err); }
+        setActionLoading(null);
+    }
 
     return (
         <div className="page-container">
@@ -138,22 +157,29 @@ export default function RecyclablesPage() {
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                         {[
-                            { label: 'Smart Bidding', desc: 'Multiple certified recyclers bid for your material', icon: '⚡', coins: 'Earn ₹', primary: true },
-                            { label: 'Smart Deal Mode', desc: 'Direct price agreement with a verified merchant', icon: '🤝', coins: 'Earn ₹', primary: true, isDeal: true },
-                            { label: 'Donate for Reuse', desc: 'Give to craft groups or workshops', icon: '🎨', coins: '+60 🪙', primary: false },
-                            { label: 'Drop at Recycling Center', desc: 'Find nearest certified center', icon: '🏭', coins: '+30 🪙', primary: false },
+                            { label: 'Smart Bidding', desc: 'Multiple certified recyclers bid for your material', icon: '⚡', coins: 'Earn ₹', primary: true, actionKey: null },
+                            { label: 'Smart Deal Mode', desc: 'Direct price agreement with a verified merchant', icon: '🤝', coins: 'Earn ₹', primary: true, isDeal: true, actionKey: null },
+                            { label: 'Donate for Reuse', desc: 'Give to craft groups or workshops', icon: '🎨', coins: '+60 🪙', primary: false, actionKey: 'donate_reuse', reward: 60 },
+                            { label: 'Drop at Recycling Center', desc: 'Find nearest certified center', icon: '🏭', coins: '+30 🪙', primary: false, actionKey: 'drop_center', reward: 30 },
                         ].map((act, i) => (
                             <motion.div
                                 key={i}
                                 className="list-item"
-                                style={{ cursor: 'pointer' }}
+                                style={{ cursor: 'pointer', opacity: actionDone.includes(act.actionKey) ? 0.7 : 1 }}
                                 whileTap={{ scale: 0.98 }}
-                                onClick={act.isDeal ? () => navigate('/direct-deal') : undefined}
+                                onClick={() => {
+                                    if (act.isDeal) navigate('/direct-deal');
+                                    else if (act.actionKey) handleAction(`${act.label}: ${mat?.label || 'Material'}`, act.reward, act.icon, act.actionKey);
+                                }}
                             >
-                                <span style={{ fontSize: '1.4rem' }}>{act.icon}</span>
+                                <span style={{ fontSize: '1.4rem' }}>
+                                    {actionDone.includes(act.actionKey) ? '✅' : actionLoading === act.actionKey ? '⏳' : act.icon}
+                                </span>
                                 <div style={{ flex: 1 }}>
                                     <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>{act.label}</p>
-                                    <p style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 2 }}>{act.desc}</p>
+                                    <p style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 2 }}>
+                                        {actionDone.includes(act.actionKey) ? 'Done! Coins credited ✅' : act.desc}
+                                    </p>
                                 </div>
                                 <span className={`badge ${act.primary ? 'badge-gold' : 'badge-green'}`}>{act.coins}</span>
                             </motion.div>

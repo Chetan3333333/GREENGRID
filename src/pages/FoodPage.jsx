@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Apple, Heart, Sprout, MapPin, ChevronRight, Phone, Clock, Truck } from 'lucide-react';
+import { Apple, Heart, Sprout, MapPin, ChevronRight, Phone, Clock, Truck, CheckCircle, Loader2 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { addTransaction, updateUserStats } from '../services/database';
 
 const fadeUp = (d = 0) => ({
     initial: { opacity: 0, y: 18 },
@@ -22,6 +24,28 @@ const compostOptions = [
 
 export default function FoodPage() {
     const [tab, setTab] = useState('edible');
+    const { currentUser, fetchUserProfile } = useAuth();
+    const [donating, setDonating] = useState(null); // index of NGO being donated to
+    const [donated, setDonated] = useState([]); // indexes of completed donations
+
+    async function handleDonate(ngoName, index) {
+        if (!currentUser || donating !== null) return;
+        setDonating(index);
+        try {
+            await addTransaction(currentUser.uid, {
+                type: 'earn',
+                coins: 150,
+                reason: `Food donated to ${ngoName}`,
+                emoji: '🍎',
+            });
+            await updateUserStats(currentUser.uid, { greenCoins: 150, donations: 1, co2Reduced: 2 });
+            await fetchUserProfile(currentUser.uid);
+            setDonated(prev => [...prev, index]);
+        } catch (err) {
+            console.error('Donation failed:', err);
+        }
+        setDonating(null);
+    }
 
     return (
         <div className="page-container">
@@ -76,9 +100,21 @@ export default function FoodPage() {
                                         <div style={s.ngoDetail}><Phone size={12} color="#64748b" /> {ngo.phone}</div>
                                         <div style={s.ngoDetail}><Clock size={12} color="#64748b" /> {ngo.timing}</div>
                                     </div>
-                                    <button className="btn btn-primary btn-sm" style={{ width: '100%', marginTop: 10 }}>
-                                        Donate Now <ChevronRight size={14} />
+                                    <button
+                                        className="btn btn-primary btn-sm"
+                                        style={{ width: '100%', marginTop: 10 }}
+                                        onClick={() => handleDonate(ngo.name, i)}
+                                        disabled={donating !== null || donated.includes(i)}
+                                    >
+                                        {donated.includes(i) ? (
+                                            <><CheckCircle size={14} /> Donated ✅</>
+                                        ) : donating === i ? (
+                                            <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Saving...</>
+                                        ) : (
+                                            <>Donate Now <ChevronRight size={14} /></>
+                                        )}
                                     </button>
+                                    {donating === i && <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>}
                                 </motion.div>
                             ))}
                         </div>

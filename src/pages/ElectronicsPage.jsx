@@ -3,8 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
     Cpu, Heart, Gavel, Recycle, ChevronRight, Star, MapPin, Shield,
-    TrendingUp, Package, Timer, Truck, CheckCircle, Coins, X, Handshake
+    TrendingUp, Package, Timer, Truck, CheckCircle, Coins, X, Handshake, Loader2
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { addTransaction, updateUserStats } from '../services/database';
 
 const fadeUp = (d = 0) => ({
     initial: { opacity: 0, y: 18 },
@@ -57,6 +59,25 @@ export default function ElectronicsPage() {
     const [selected, setSelected] = useState(null);
     const [expandedBid, setExpandedBid] = useState(null);
     const navigate = useNavigate();
+    const { currentUser, fetchUserProfile } = useAuth();
+    const [actionLoading, setActionLoading] = useState(null);
+    const [actionDone, setActionDone] = useState([]);
+
+    async function handleAction(label, coins, emoji, index) {
+        if (!currentUser || actionLoading !== null) return;
+        setActionLoading(index);
+        try {
+            await addTransaction(currentUser.uid, {
+                type: 'earn', coins, reason: label, emoji,
+            });
+            const updates = { greenCoins: coins, itemsRecycled: 1 };
+            if (emoji === '💻') updates.donations = 1;
+            await updateUserStats(currentUser.uid, updates);
+            await fetchUserProfile(currentUser.uid);
+            setActionDone(prev => [...prev, index]);
+        } catch (err) { console.error(err); }
+        setActionLoading(null);
+    }
 
     return (
         <div className="page-container">
@@ -215,17 +236,24 @@ export default function ElectronicsPage() {
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                         {ngosList.map((ngo, i) => (
-                            <motion.div key={i} className="card card-sm" style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }} whileTap={{ scale: 0.98 }}>
+                            <motion.div key={i} className="card card-sm" style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }} whileTap={{ scale: 0.98 }}
+                                onClick={() => !actionDone.includes(`d${i}`) && handleAction(`Donated device to ${ngo.name}`, 200, '💻', `d${i}`)}
+                            >
                                 <div style={{ ...s.merchIcon, background: 'rgba(16,185,129,0.1)' }}>
-                                    <Heart size={20} color="#10b981" />
+                                    {actionDone.includes(`d${i}`) ? <CheckCircle size={20} color="#10b981" /> : actionLoading === `d${i}` ? <Loader2 size={20} color="#10b981" style={{ animation: 'spin 1s linear infinite' }} /> : <Heart size={20} color="#10b981" />}
                                 </div>
                                 <div style={{ flex: 1 }}>
                                     <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>{ngo.name}</p>
                                     <p style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 2 }}>{ngo.type} · Accepts {ngo.items}</p>
                                 </div>
-                                <ChevronRight size={16} color="#475569" />
+                                {actionDone.includes(`d${i}`) ? (
+                                    <span className="badge badge-green">+200 🪙</span>
+                                ) : (
+                                    <ChevronRight size={16} color="#475569" />
+                                )}
                             </motion.div>
                         ))}
+                        {actionLoading && <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>}
                     </div>
                 </motion.div>
             )}
@@ -239,8 +267,11 @@ export default function ElectronicsPage() {
                         <p style={{ fontSize: '0.82rem', color: '#94a3b8', marginTop: 8, lineHeight: 1.5 }}>
                             Your e-waste will be processed by certified facilities ensuring zero landfill disposal. All hazardous materials handled safely.
                         </p>
-                        <button className="btn btn-primary" style={{ marginTop: 16 }}>
-                            Schedule Free Pickup <ChevronRight size={14} />
+                        <button className="btn btn-primary" style={{ marginTop: 16 }}
+                            onClick={() => !actionDone.includes('recycle') && handleAction('Scheduled e-waste recycling pickup', 80, '♻️', 'recycle')}
+                            disabled={actionDone.includes('recycle')}
+                        >
+                            {actionDone.includes('recycle') ? <><CheckCircle size={14} /> Scheduled ✅</> : <>Schedule Free Pickup <ChevronRight size={14} /></>}
                         </button>
                     </div>
                 </motion.div>
