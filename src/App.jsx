@@ -18,20 +18,22 @@ const pageTitles = {
   '/profile': 'Profile',
 };
 
+const hideNavPaths = ['/', '/login', '/register'];
+
 export default function App() {
   const location = useLocation();
-  const isSplash = location.pathname === '/';
+  const hideNav = hideNavPaths.includes(location.pathname);
   const title = pageTitles[location.pathname] || 'GreenGrid';
 
   return (
     <>
       <div className="orb orb-green" />
       <div className="orb orb-gold" />
-      {!isSplash && <Header title={title} />}
+      {!hideNav && <Header title={title} />}
       <PageTransition keyVal={location.pathname}>
         <Outlet />
       </PageTransition>
-      {!isSplash && <BottomNav />}
+      {!hideNav && <BottomNav />}
     </>
   );
 }

@@ -4,18 +4,13 @@ import {
     User, Award, Coins, Recycle, Settings, ChevronRight,
     Bell, Moon, LogOut, HelpCircle, Heart, Shield, TrendingUp
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 const fadeUp = (d = 0) => ({
     initial: { opacity: 0, y: 18 },
     animate: { opacity: 1, y: 0 },
     transition: { delay: d, duration: 0.4 },
 });
-
-const impactStats = [
-    { label: 'Items Saved', value: '127', icon: Recycle, color: '#10b981' },
-    { label: 'CO₂ Reduced', value: '48kg', icon: TrendingUp, color: '#3b82f6' },
-    { label: 'Donations', value: '34', icon: Heart, color: '#ec4899' },
-];
 
 const menuItems = [
     { label: 'Notification Settings', icon: Bell, color: '#3b82f6' },
@@ -27,6 +22,31 @@ const menuItems = [
 
 export default function ProfilePage() {
     const navigate = useNavigate();
+    const { currentUser, userProfile, logout } = useAuth();
+
+    const displayName = userProfile?.name || currentUser?.displayName || 'User';
+    const email = currentUser?.email || '';
+    const greenCoins = userProfile?.greenCoins ?? 0;
+    const itemsRecycled = userProfile?.itemsRecycled ?? 0;
+    const co2Reduced = userProfile?.co2Reduced ?? 0;
+    const donations = userProfile?.donations ?? 0;
+    const role = userProfile?.role || 'individual';
+    const joinDate = userProfile?.joinedAt ? new Date(userProfile.joinedAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'New Member';
+
+    const impactStats = [
+        { label: 'Items Saved', value: String(itemsRecycled), icon: Recycle, color: '#10b981' },
+        { label: 'CO₂ Reduced', value: `${co2Reduced}kg`, icon: TrendingUp, color: '#3b82f6' },
+        { label: 'Donations', value: String(donations), icon: Heart, color: '#ec4899' },
+    ];
+
+    async function handleLogout() {
+        try {
+            await logout();
+            navigate('/login');
+        } catch (err) {
+            console.error('Logout failed:', err);
+        }
+    }
 
     return (
         <div className="page-container">
@@ -34,29 +54,22 @@ export default function ProfilePage() {
             <motion.div {...fadeUp(0)} className="card" style={s.profileCard}>
                 <div style={s.avatarRow}>
                     <div style={s.avatar}>
-                        <svg width="40" height="40" viewBox="0 0 100 100" fill="none">
-                            {/* Tree trunk */}
-                            <rect x="44" y="55" width="12" height="28" rx="3" fill="#7c5c3c" />
-                            <rect x="46" y="57" width="4" height="24" rx="2" fill="#9a7b5a" opacity="0.5" />
-                            {/* Tree crown layers */}
-                            <ellipse cx="50" cy="42" rx="28" ry="24" fill="#059669" />
-                            <ellipse cx="50" cy="38" rx="24" ry="20" fill="#10b981" />
-                            <ellipse cx="50" cy="34" rx="18" ry="16" fill="#34d399" />
-                            <ellipse cx="50" cy="30" rx="12" ry="11" fill="#6ee7b7" />
-                            {/* Leaf highlights */}
-                            <circle cx="38" cy="36" r="3" fill="#a7f3d0" opacity="0.6" />
-                            <circle cx="55" cy="28" r="2" fill="#a7f3d0" opacity="0.5" />
-                            <circle cx="45" cy="44" r="2.5" fill="#a7f3d0" opacity="0.4" />
-                            {/* Ground */}
-                            <ellipse cx="50" cy="84" rx="22" ry="4" fill="#064e3b" opacity="0.3" />
-                        </svg>
+                        {currentUser?.photoURL ? (
+                            <img src={currentUser.photoURL} alt="Profile" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                        ) : (
+                            <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#10b981' }}>
+                                {displayName.charAt(0).toUpperCase()}
+                            </span>
+                        )}
                     </div>
                     <div style={{ flex: 1 }}>
-                        <h3 style={{ fontWeight: 700, fontSize: '1.15rem' }}>Green Hero</h3>
-                        <p style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: 2 }}>Eco Champion · Member since Jan 2025</p>
+                        <h3 style={{ fontWeight: 700, fontSize: '1.15rem' }}>{displayName}</h3>
+                        <p style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: 2 }}>
+                            {email} · {role === 'merchant' ? '🏭 Merchant' : '🌿 Individual'} · Since {joinDate}
+                        </p>
                         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                            <span className="badge badge-green">🌿 Level 7</span>
-                            <span className="badge badge-gold">🪙 2,450</span>
+                            <span className="badge badge-green">🌿 {role === 'merchant' ? 'Merchant' : 'Eco Champion'}</span>
+                            <span className="badge badge-gold">🪙 {greenCoins.toLocaleString()}</span>
                         </div>
                     </div>
                 </div>
@@ -132,14 +145,18 @@ export default function ProfilePage() {
 
             {/* Logout */}
             <motion.div {...fadeUp(0.4)} style={{ marginTop: 20, marginBottom: 20 }}>
-                <button className="btn btn-secondary" style={{ width: '100%', color: '#ef4444', borderColor: 'rgba(239,68,68,0.2)' }}>
+                <button
+                    className="btn btn-secondary"
+                    style={{ width: '100%', color: '#ef4444', borderColor: 'rgba(239,68,68,0.2)' }}
+                    onClick={handleLogout}
+                >
                     <LogOut size={16} /> Sign Out
                 </button>
             </motion.div>
 
             {/* Version */}
             <p style={{ textAlign: 'center', fontSize: '0.7rem', color: '#475569', paddingBottom: 10 }}>
-                GreenGrid v1.0.0 · Made with 💚
+                GreenGrid v2.0.0 · Made with 💚
             </p>
         </div>
     );
@@ -161,6 +178,7 @@ const s = {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        overflow: 'hidden',
     },
     toggleOn: {
         width: 40,

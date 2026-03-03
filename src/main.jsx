@@ -1,8 +1,12 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext.jsx';
+import ProtectedRoute from './components/ProtectedRoute.jsx';
 import App from './App.jsx';
 import SplashPage from './pages/SplashPage.jsx';
+import LoginPage from './pages/LoginPage.jsx';
+import RegisterPage from './pages/RegisterPage.jsx';
 import HomePage from './pages/HomePage.jsx';
 import ScanPage from './pages/ScanPage.jsx';
 import FoodPage from './pages/FoodPage.jsx';
@@ -23,18 +27,20 @@ const router = createBrowserRouter([
     element: <App />,
     children: [
       { index: true, element: <SplashPage /> },
-      { path: 'home', element: <HomePage /> },
-      { path: 'scan', element: <ScanPage /> },
-      { path: 'food', element: <FoodPage /> },
-      { path: 'electronics', element: <ElectronicsPage /> },
-      { path: 'recyclables', element: <RecyclablesPage /> },
-      { path: 'wallet', element: <WalletPage /> },
-      { path: 'credit-score', element: <CreditScorePage /> },
-      { path: 'marketplace', element: <MarketplacePage /> },
-      { path: 'bidding', element: <BiddingPage /> },
-      { path: 'direct-deal', element: <DirectDealPage /> },
-      { path: 'chatbot', element: <ChatbotPage /> },
-      { path: 'profile', element: <ProfilePage /> },
+      { path: 'login', element: <LoginPage /> },
+      { path: 'register', element: <RegisterPage /> },
+      { path: 'home', element: <ProtectedRoute><HomePage /></ProtectedRoute> },
+      { path: 'scan', element: <ProtectedRoute><ScanPage /></ProtectedRoute> },
+      { path: 'food', element: <ProtectedRoute><FoodPage /></ProtectedRoute> },
+      { path: 'electronics', element: <ProtectedRoute><ElectronicsPage /></ProtectedRoute> },
+      { path: 'recyclables', element: <ProtectedRoute><RecyclablesPage /></ProtectedRoute> },
+      { path: 'wallet', element: <ProtectedRoute><WalletPage /></ProtectedRoute> },
+      { path: 'credit-score', element: <ProtectedRoute><CreditScorePage /></ProtectedRoute> },
+      { path: 'marketplace', element: <ProtectedRoute><MarketplacePage /></ProtectedRoute> },
+      { path: 'bidding', element: <ProtectedRoute><BiddingPage /></ProtectedRoute> },
+      { path: 'direct-deal', element: <ProtectedRoute><DirectDealPage /></ProtectedRoute> },
+      { path: 'chatbot', element: <ProtectedRoute><ChatbotPage /></ProtectedRoute> },
+      { path: 'profile', element: <ProtectedRoute><ProfilePage /></ProtectedRoute> },
       { path: '*', element: <Navigate to="/home" replace /> },
     ],
   },
@@ -42,6 +48,8 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
   </StrictMode>,
 );
