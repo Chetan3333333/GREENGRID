@@ -134,7 +134,7 @@ export default function ZeroWasteChef({ userId }) {
         setChatLoading(true);
 
         try {
-            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+            const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
             // Build the prompt parts array
             // For text-only: just send the text prompt
@@ -209,7 +209,7 @@ export default function ZeroWasteChef({ userId }) {
                 Categories: vegetable, fruit, dairy, grain, protein, packaged, cooked, other.
                 Be accurate with expiry estimates for Indian climate.`;
 
-                const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+                const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
                 const result = await model.generateContent([prompt, imagePart]);
                 const text = result.response.text();
                 const clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
