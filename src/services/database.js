@@ -358,3 +358,45 @@ export function listenToItems(callback) {
     });
     return () => off(itemsRef);
 }
+
+// ============================================
+// 🌱 COMPOST — Save & manage compost entries
+// ============================================
+
+/**
+ * Save a new compost entry
+ */
+export async function saveCompostEntry(userId, data) {
+    const compostRef = ref(database, `compost/${userId}`);
+    const newRef = push(compostRef);
+    await set(newRef, {
+        ...data,
+        status: data.status || 'active',
+        createdAt: new Date().toISOString(),
+    });
+    return newRef.key;
+}
+
+/**
+ * Get all compost entries for a user
+ */
+export async function getCompostEntries(userId) {
+    const compostRef = ref(database, `compost/${userId}`);
+    const snapshot = await get(compostRef);
+    const entries = [];
+    if (snapshot.exists()) {
+        snapshot.forEach((child) => {
+            entries.push({ id: child.key, ...child.val() });
+        });
+    }
+    return entries.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+/**
+ * Update compost entry status (e.g., from 'processing' to 'ready')
+ */
+export async function updateCompostStatus(userId, entryId, status) {
+    const entryRef = ref(database, `compost/${userId}/${entryId}`);
+    await update(entryRef, { status, updatedAt: new Date().toISOString() });
+}
+

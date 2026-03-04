@@ -10,6 +10,7 @@ import { addTransaction, updateUserStats, saveDonation, getUserDonations, update
 import { useNavigate } from 'react-router-dom';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import ZeroWasteChef from '../components/ZeroWasteChef';
+import CompostWizard from '../components/CompostWizard';
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || '');
@@ -522,32 +523,8 @@ export default function FoodPage() {
                             {currentUser && <ZeroWasteChef userId={currentUser.uid} onDonate={() => setStep(1)} />}
                         </>
                     ) : tab === 'compost' ? (
-                        /* Compost Tab — unchanged */
                         <motion.div {...fadeUp(0.2)}>
-                            <div className="section-header"><span className="section-title">Composting Options</span></div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                                {compostOptions.map((opt, i) => (
-                                    <motion.div key={i} className="card card-sm" style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }} whileTap={{ scale: 0.98 }}>
-                                        <div className="icon-circle" style={{ background: `${opt.color}15` }}>
-                                            <opt.icon size={22} color={opt.color} />
-                                        </div>
-                                        <div style={{ flex: 1 }}>
-                                            <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>{opt.name}</p>
-                                            <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 2 }}>{opt.desc}</p>
-                                        </div>
-                                        <ChevronRight size={16} color="#475569" />
-                                    </motion.div>
-                                ))}
-                            </div>
-                            <div className="card" style={{ marginTop: 16, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                    <span style={{ fontSize: '1.5rem' }}>♻️</span>
-                                    <div>
-                                        <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>Compost Impact</p>
-                                        <p style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: 2 }}>Composting reduces methane emissions and enriches soil</p>
-                                    </div>
-                                </div>
-                            </div>
+                            {currentUser && <CompostWizard userId={currentUser.uid} />}
                         </motion.div>
                     ) : (
                         /* My Donations Tab */
