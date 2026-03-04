@@ -166,7 +166,7 @@ export default function FoodPage() {
                 "safeForDonation": true or false,
                 "safetyNote": "This food appears fresh and safe for donation" (1 sentence)
             }`;
-            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
             const result = await model.generateContent([prompt, imagePart]);
             const text = result.response.text();
             const clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -197,7 +197,7 @@ export default function FoodPage() {
                 { "name": "Smoothie", "emoji": "\ud83e\udd64", "time": "5 min", "difficulty": "Easy", "ingredients": "milk, honey, ice", "steps": "1. Blend all ingredients. 2. Serve cold." },
                 { "name": "Pancakes", "emoji": "\ud83e\udd5e", "time": "15 min", "difficulty": "Easy", "ingredients": "flour, milk, butter", "steps": "1. Mix batter. 2. Cook on pan. 3. Serve with syrup." }
             ]`;
-            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
             const result = await model.generateContent([prompt, imagePart]);
             const text = result.response.text();
             const clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
