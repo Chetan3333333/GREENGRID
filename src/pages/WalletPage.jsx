@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-    Wallet, TrendingUp, TrendingDown, Coins, Gift,
-    ChevronRight, ArrowUpRight, ArrowDownLeft, Gavel, Leaf, Loader2
+    Wallet, TrendingUp, TrendingDown, Coins, Gift, IndianRupee,
+    ChevronRight, ArrowUpRight, ArrowDownLeft, Gavel, Leaf, Loader2, Banknote
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getUserTransactions } from '../services/database';
@@ -39,6 +39,12 @@ export default function WalletPage() {
 
     const greenCoins = userProfile?.greenCoins ?? 0;
 
+    // Extract ₹ real money from bid acceptance transactions
+    const extractRupees = (reason) => {
+        const match = reason?.match(/₹([\d,]+)/);
+        return match ? parseInt(match[1].replace(/,/g, ''), 10) : 0;
+    };
+
     // Fetch transactions from database
     useEffect(() => {
         async function loadTransactions() {
@@ -69,6 +75,12 @@ export default function WalletPage() {
         .reduce((sum, t) => sum + (t.coins || 0), 0);
 
     const exchangeCount = transactions.filter(t => t.type === 'exchange').length;
+
+    // Real money earned from bid acceptances
+    const bidTransactions = transactions.filter(t => t.reason?.includes('Bid accepted'));
+    const totalRupees = bidTransactions.reduce((sum, t) => sum + extractRupees(t.reason), 0);
+    const totalBidDeals = bidTransactions.length;
+    const avgDealValue = totalBidDeals > 0 ? Math.round(totalRupees / totalBidDeals) : 0;
 
     const filtered = filter === 'all'
         ? transactions
@@ -113,21 +125,54 @@ export default function WalletPage() {
                 </div>
             </motion.div>
 
-            {/* Exchange Earnings */}
+            {/* ₹ Real Money Earnings */}
             <motion.div
-                {...fadeUp(0.1)}
+                {...fadeUp(0.08)}
+                className="card card-sm"
+                style={{ marginBottom: 12, background: 'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(99,102,241,0.04))', border: '1px solid rgba(59,130,246,0.18)', padding: 20 }}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(59,130,246,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Banknote size={18} color="#3b82f6" />
+                    </div>
+                    <div>
+                        <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Real Money Earned</span>
+                        <p style={{ fontSize: '0.68rem', color: '#64748b', marginTop: 1 }}>From material exchange bids</p>
+                    </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 14 }}>
+                    <span style={{ fontSize: '2rem', fontWeight: 900, color: '#60a5fa' }}>₹{totalRupees.toLocaleString()}</span>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>total earned</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
+                    {[
+                        { val: totalBidDeals, label: 'Deals Done', color: '#3b82f6' },
+                        { val: `₹${avgDealValue}`, label: 'Avg Deal', color: '#a78bfa' },
+                        { val: `${transactions.length}`, label: 'Total Txns', color: '#fbbf24' },
+                    ].map((stat, i) => (
+                        <div key={i}>
+                            <span style={{ fontWeight: 800, fontSize: '1rem', color: stat.color }}>{stat.val}</span>
+                            <p style={{ fontSize: '0.65rem', color: '#64748b', marginTop: 2 }}>{stat.label}</p>
+                        </div>
+                    ))}
+                </div>
+            </motion.div>
+
+            {/* GreenCoins Stats */}
+            <motion.div
+                {...fadeUp(0.12)}
                 className="card card-sm"
                 style={{ marginBottom: 16, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}
             >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                    <Gavel size={16} color="#10b981" />
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Exchange Earnings</span>
+                    <Coins size={16} color="#10b981" />
+                    <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>GreenCoin Stats</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
                     {[
-                        { val: `${exchangeTotal}`, label: 'Coins Earned', color: '#10b981' },
-                        { val: `${exchangeCount}`, label: 'Exchanges', color: '#3b82f6' },
-                        { val: `${transactions.length}`, label: 'Total Txns', color: '#fbbf24' },
+                        { val: `${earned30d}`, label: 'Earned (30d)', color: '#10b981' },
+                        { val: `${spent30d}`, label: 'Spent (30d)', color: '#f59e0b' },
+                        { val: `${greenCoins}`, label: 'Balance', color: '#34d399' },
                     ].map((stat, i) => (
                         <div key={i}>
                             <span style={{ fontWeight: 800, fontSize: '1rem', color: stat.color }}>{stat.val}</span>
@@ -190,12 +235,17 @@ export default function WalletPage() {
                                     <p style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 2 }}>{timeAgo(tx.createdAt)}</p>
                                 </div>
                                 <div style={{ textAlign: 'right' }}>
-                                    {tx.amount && (
-                                        <p style={{ fontWeight: 700, color: '#10b981', fontSize: '0.88rem' }}>{tx.amount}</p>
-                                    )}
+                                    {(() => {
+                                        const rupees = extractRupees(tx.reason);
+                                        return rupees > 0 ? (
+                                            <p style={{ fontWeight: 700, color: '#60a5fa', fontSize: '0.88rem' }}>₹{rupees.toLocaleString()}</p>
+                                        ) : tx.amount ? (
+                                            <p style={{ fontWeight: 700, color: '#10b981', fontSize: '0.88rem' }}>{tx.amount}</p>
+                                        ) : null;
+                                    })()}
                                     <p style={{
                                         fontWeight: 600,
-                                        fontSize: tx.amount ? '0.7rem' : '0.85rem',
+                                        fontSize: (extractRupees(tx.reason) > 0 || tx.amount) ? '0.7rem' : '0.85rem',
                                         color: tx.type === 'spend' ? '#f59e0b' : '#34d399',
                                     }}>
                                         {tx.type === 'spend' ? `-${Math.abs(tx.coins)}` : `+${tx.coins}`} 🪙
