@@ -3,11 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Apple, Heart, Sprout, MapPin, ChevronRight, Phone, Clock, Truck, CheckCircle,
     Loader2, Camera, ArrowLeft, ArrowRight, Star, Copy, Share2, Home, RotateCcw,
-    Upload, X, Leaf, Package, UtensilsCrossed, Egg
+    Upload, X, Leaf, Package, UtensilsCrossed, Egg, Sparkles, Zap, BookOpen
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { addTransaction, updateUserStats, saveDonation, getUserDonations, updateDonationStatus } from '../services/database';
 import { useNavigate } from 'react-router-dom';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// Initialize Gemini AI
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || '');
 
 const fadeUp = (d = 0) => ({
     initial: { opacity: 0, y: 18 },
@@ -69,6 +73,16 @@ export default function FoodPage() {
     const [donationsLoading, setDonationsLoading] = useState(false);
     const [lastDonationId, setLastDonationId] = useState(null);
 
+    // AI state
+    const [aiAnalyzing, setAiAnalyzing] = useState(false);
+    const [aiResult, setAiResult] = useState(null);
+    const [aiError, setAiError] = useState('');
+    const [recipeMode, setRecipeMode] = useState(false);
+    const [recipeResult, setRecipeResult] = useState(null);
+    const [recipeLoading, setRecipeLoading] = useState(false);
+    const [recipePhoto, setRecipePhoto] = useState(null);
+    const recipeFileRef = useRef(null);
+
     // Step 1 — Food details
     const [foodType, setFoodType] = useState(null);
     const [quantity, setQuantity] = useState(1);
@@ -114,18 +128,109 @@ export default function FoodPage() {
 
     const ngoData = selectedNgo !== null ? filteredNgos[selectedNgo] : null;
 
-    // Photo handler
+    // Photo handler — triggers AI analysis
     function handlePhoto(e) {
         const file = e.target.files?.[0];
         if (file) {
             const reader = new FileReader();
-            reader.onload = (ev) => setPhotoPreview(ev.target.result);
+            reader.onload = (ev) => {
+                setPhotoPreview(ev.target.result);
+                analyzeWithAI(ev.target.result);
+            };
             reader.readAsDataURL(file);
         }
     }
 
     function toggleTag(tag) {
         setTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+    }
+
+    // AI Photo Analysis — auto-fills form fields
+    async function analyzeWithAI(imageBase64) {
+        setAiAnalyzing(true);
+        setAiError('');
+        setAiResult(null);
+        try {
+            const base64Data = imageBase64.split(',')[1];
+            const imagePart = { inlineData: { data: base64Data, mimeType: 'image/jpeg' } };
+            const prompt = `You are an AI food analyzer for a food donation app. Analyze this food image and return ONLY a valid JSON object (no markdown backticks). Be accurate and practical.
+            {
+                "foodType": "cooked" or "raw" or "packaged" or "fruits" (pick the best match),
+                "itemsDetected": ["Rice", "Dal", "Sabzi"] (list of food items you can see),
+                "estimatedServings": 8 (number, your best estimate of how many people this can feed),
+                "estimatedWeight": "2.5 kg" (rough weight estimate),
+                "freshness": "Prepared today" or "Yesterday" or "Expires in 2 days" or "Expires in a week" (pick best match based on appearance),
+                "freshnessNote": "Food looks freshly prepared with visible steam" (1 sentence explaining your freshness assessment),
+                "dietaryTags": ["Vegetarian"] (pick from: Vegetarian, Non-Veg, Vegan, Contains Nuts, Gluten-Free, Needs Refrigeration, No Preservatives),
+                "safeForDonation": true or false,
+                "safetyNote": "This food appears fresh and safe for donation" (1 sentence)
+            }`;
+            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+            const result = await model.generateContent([prompt, imagePart]);
+            const text = result.response.text();
+            const clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
+            const parsed = JSON.parse(clean);
+            setAiResult(parsed);
+            // Auto-fill form fields
+            if (parsed.foodType) setFoodType(parsed.foodType);
+            if (parsed.estimatedServings) { setQuantity(parsed.estimatedServings); setQuantityUnit('servings'); }
+            if (parsed.freshness) setExpiry(parsed.freshness);
+            if (parsed.dietaryTags?.length) setTags(parsed.dietaryTags);
+        } catch (err) {
+            console.error('AI analysis failed:', err);
+            setAiError('AI analysis failed. Please fill in manually.');
+        }
+        setAiAnalyzing(false);
+    }
+
+    // AI Recipe Suggestion
+    async function getRecipeSuggestions(imageBase64) {
+        setRecipeLoading(true);
+        setRecipeResult(null);
+        try {
+            const base64Data = imageBase64.split(',')[1];
+            const imagePart = { inlineData: { data: base64Data, mimeType: 'image/jpeg' } };
+            const prompt = `You are a helpful chef AI. Look at this food image and suggest 3 quick recipes to use it before it goes to waste. Return ONLY a valid JSON array (no markdown backticks):
+            [
+                { "name": "Banana Bread", "emoji": "\ud83c\udf5e", "time": "30 min", "difficulty": "Easy", "ingredients": "flour, sugar, eggs", "steps": "1. Mash bananas. 2. Mix ingredients. 3. Bake at 180°C for 30 mins." },
+                { "name": "Smoothie", "emoji": "\ud83e\udd64", "time": "5 min", "difficulty": "Easy", "ingredients": "milk, honey, ice", "steps": "1. Blend all ingredients. 2. Serve cold." },
+                { "name": "Pancakes", "emoji": "\ud83e\udd5e", "time": "15 min", "difficulty": "Easy", "ingredients": "flour, milk, butter", "steps": "1. Mix batter. 2. Cook on pan. 3. Serve with syrup." }
+            ]`;
+            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+            const result = await model.generateContent([prompt, imagePart]);
+            const text = result.response.text();
+            const clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
+            setRecipeResult(JSON.parse(clean));
+        } catch (err) {
+            console.error('Recipe AI failed:', err);
+            setRecipeResult([{ name: 'Could not analyze', emoji: '❓', time: '-', difficulty: '-', ingredients: '-', steps: 'Please try again with a clearer photo.' }]);
+        }
+        setRecipeLoading(false);
+    }
+
+    function handleRecipePhoto(e) {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                setRecipePhoto(ev.target.result);
+                getRecipeSuggestions(ev.target.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    // Smart NGO scoring
+    function getNgoScore(ngo) {
+        let score = 0;
+        if (ngo.need === 'high') score += 40;
+        else if (ngo.need === 'medium') score += 20;
+        else score += 5;
+        score += ngo.rating * 8;
+        const dist = parseFloat(ngo.dist);
+        score += Math.max(0, 30 - dist * 5);
+        if (foodType && ngo.accepts.includes(foodType)) score += 15;
+        return Math.round(score);
     }
 
     // After tracking completes — award coins
@@ -412,6 +517,60 @@ export default function FoodPage() {
                                     ))}
                                 </div>
                             </motion.div>
+
+                            {/* AI Recipe Suggestions */}
+                            <motion.div {...fadeUp(0.4)} style={{ marginTop: 16 }}>
+                                <div className="section-header">
+                                    <span className="section-title">AI Recipe Saver</span>
+                                    <span className="badge badge-blue" style={{ fontSize: '0.58rem' }}><Sparkles size={8} /> Gemini AI</span>
+                                </div>
+                                <div className="card" style={{ padding: 20, background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(59,130,246,0.04))', border: '1px solid rgba(99,102,241,0.18)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                                        <span style={{ fontSize: '1.5rem' }}>👨‍🍳</span>
+                                        <div>
+                                            <p style={{ fontWeight: 700, fontSize: '0.9rem' }}>Got leftovers? Don’t waste them!</p>
+                                            <p style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 2 }}>Snap a photo — AI suggests recipes or helps you donate</p>
+                                        </div>
+                                    </div>
+                                    <input type="file" accept="image/*" capture="environment" ref={recipeFileRef} onChange={handleRecipePhoto} style={{ display: 'none' }} />
+                                    {!recipePhoto ? (
+                                        <button className="btn btn-sm" style={{ width: '100%', background: 'rgba(99,102,241,0.12)', color: '#a78bfa', border: '1px solid rgba(99,102,241,0.2)' }} onClick={() => recipeFileRef.current?.click()}>
+                                            <Camera size={14} /> Snap Food Photo for Recipes
+                                        </button>
+                                    ) : (
+                                        <>
+                                            <img src={recipePhoto} alt="food" style={{ width: '100%', height: 100, objectFit: 'cover', borderRadius: 10, marginBottom: 10, border: '1px solid rgba(255,255,255,0.1)' }} />
+                                            {recipeLoading ? (
+                                                <div style={{ textAlign: 'center', padding: 16 }}>
+                                                    <Loader2 size={18} color="#a78bfa" style={{ animation: 'spin 1s linear infinite' }} />
+                                                    <p style={{ fontSize: '0.78rem', color: '#a78bfa', marginTop: 6 }}>👨‍🍳 Chef AI is thinking...</p>
+                                                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                                                </div>
+                                            ) : recipeResult ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                    {recipeResult.map((r, i) => (
+                                                        <motion.div key={i} className="card card-sm" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 12 }}>
+                                                            <span style={{ fontSize: '1.3rem' }}>{r.emoji}</span>
+                                                            <div style={{ flex: 1 }}>
+                                                                <p style={{ fontWeight: 600, fontSize: '0.82rem' }}>{r.name}</p>
+                                                                <p style={{ fontSize: '0.65rem', color: '#64748b' }}>⏰ {r.time} · {r.difficulty}</p>
+                                                            </div>
+                                                        </motion.div>
+                                                    ))}
+                                                    <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                                                        <button className="btn btn-sm btn-secondary" style={{ flex: 1, fontSize: '0.72rem' }} onClick={() => { setRecipePhoto(null); setRecipeResult(null); }}>
+                                                            <RotateCcw size={12} /> Try Again
+                                                        </button>
+                                                        <button className="btn btn-sm btn-primary" style={{ flex: 1, fontSize: '0.72rem' }} onClick={() => { setRecipePhoto(null); setRecipeResult(null); setStep(1); }}>
+                                                            <Heart size={12} /> Donate Instead
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                        </>
+                                    )}
+                                </div>
+                            </motion.div>
                         </>
                     ) : tab === 'compost' ? (
                         /* Compost Tab — unchanged */
@@ -567,13 +726,16 @@ export default function FoodPage() {
                         ))}
                     </div>
 
-                    {/* Photo Upload */}
-                    <div className="section-header" style={{ marginTop: 20 }}><span className="section-title">Photo (optional)</span></div>
+                    {/* Photo Upload + AI Auto-Fill */}
+                    <div className="section-header" style={{ marginTop: 20 }}>
+                        <span className="section-title">Photo (AI Auto-Fill)</span>
+                        <span className="badge badge-blue" style={{ fontSize: '0.58rem' }}><Sparkles size={8} /> AI-Powered</span>
+                    </div>
                     <input type="file" accept="image/*" capture="environment" ref={fileRef} onChange={handlePhoto} style={{ display: 'none' }} />
                     {photoPreview ? (
                         <div style={{ position: 'relative' }}>
                             <img src={photoPreview} alt="food" style={{ width: '100%', height: 160, objectFit: 'cover', borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)' }} />
-                            <button onClick={() => setPhotoPreview(null)} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
+                            <button onClick={() => { setPhotoPreview(null); setAiResult(null); setAiError(''); }} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
                                 <X size={14} />
                             </button>
                         </div>
@@ -585,7 +747,48 @@ export default function FoodPage() {
                             whileTap={{ scale: 0.98 }}
                         >
                             <Camera size={20} color="#64748b" />
-                            <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Tap to take photo or upload</span>
+                            <div style={{ textAlign: 'center' }}>
+                                <span style={{ fontSize: '0.82rem', color: '#64748b' }}>Take photo for AI Auto-Fill</span>
+                                <p style={{ fontSize: '0.65rem', color: '#475569', marginTop: 2 }}>AI will detect food type, quantity & freshness</p>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* AI Analysis Result */}
+                    {aiAnalyzing && (
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card card-sm" style={{ marginTop: 10, textAlign: 'center', padding: 20, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)' }}>
+                            <Loader2 size={20} color="#3b82f6" style={{ animation: 'spin 1s linear infinite', margin: '0 auto' }} />
+                            <p style={{ fontSize: '0.82rem', fontWeight: 600, marginTop: 8, color: '#60a5fa' }}>AI is analyzing your food...</p>
+                            <p style={{ fontSize: '0.68rem', color: '#64748b', marginTop: 4 }}>Detecting items, quantity, and freshness</p>
+                            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                        </motion.div>
+                    )}
+                    {aiError && (
+                        <div className="card card-sm" style={{ marginTop: 10, padding: 12, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                            <p style={{ fontSize: '0.78rem', color: '#f87171' }}>⚠️ {aiError}</p>
+                        </div>
+                    )}
+                    {aiResult && !aiAnalyzing && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="card card-sm" style={{ marginTop: 10, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.18)', padding: 16 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                                <Sparkles size={14} color="#10b981" />
+                                <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#10b981' }}>AI Analysis Complete</span>
+                                <span className="badge badge-green" style={{ marginLeft: 'auto', fontSize: '0.55rem' }}>
+                                    {aiResult.safeForDonation ? '✅ Safe' : '⚠️ Caution'}
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                                {aiResult.itemsDetected?.map((item, i) => (
+                                    <span key={i} className="badge badge-blue" style={{ fontSize: '0.6rem' }}>{item}</span>
+                                ))}
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: '0.72rem' }}>
+                                <div><span style={{ color: '#64748b' }}>Servings: </span><strong>{aiResult.estimatedServings}</strong></div>
+                                <div><span style={{ color: '#64748b' }}>Weight: </span><strong>{aiResult.estimatedWeight}</strong></div>
+                                <div style={{ gridColumn: '1 / -1' }}><span style={{ color: '#64748b' }}>Freshness: </span><strong>{aiResult.freshness}</strong></div>
+                            </div>
+                            <p style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: 8, fontStyle: 'italic' }}>{aiResult.freshnessNote}</p>
+                            <p style={{ fontSize: '0.6rem', color: '#475569', marginTop: 6 }}>✨ Form auto-filled! You can edit any field above.</p>
                         </motion.div>
                     )}
 
@@ -612,39 +815,49 @@ export default function FoodPage() {
                         <span className="badge badge-green"><MapPin size={10} /> Nearby</span>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {filteredNgos.map((ngo, i) => (
-                            <motion.div
-                                key={i}
-                                className="card card-sm"
-                                style={{ cursor: 'pointer', borderColor: selectedNgo === i ? '#10b981' : undefined, background: selectedNgo === i ? 'rgba(16,185,129,0.06)' : undefined }}
-                                onClick={() => setSelectedNgo(i)}
-                                whileTap={{ scale: 0.98 }}
-                            >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                                    <div style={s.ngoIcon}><Heart size={18} color="#10b981" /></div>
-                                    <div style={{ flex: 1 }}>
-                                        <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>{ngo.name}</p>
-                                        <p style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 1 }}>{ngo.desc}</p>
+                        {[...filteredNgos].sort((a, b) => getNgoScore(b) - getNgoScore(a)).map((ngo, i) => {
+                            const score = getNgoScore(ngo);
+                            const isBestMatch = i === 0;
+                            return (
+                                <motion.div
+                                    key={i}
+                                    className="card card-sm"
+                                    style={{ cursor: 'pointer', borderColor: selectedNgo === filteredNgos.indexOf(ngo) ? '#10b981' : isBestMatch ? 'rgba(99,102,241,0.3)' : undefined, background: selectedNgo === filteredNgos.indexOf(ngo) ? 'rgba(16,185,129,0.06)' : isBestMatch ? 'rgba(99,102,241,0.04)' : undefined }}
+                                    onClick={() => setSelectedNgo(filteredNgos.indexOf(ngo))}
+                                    whileTap={{ scale: 0.98 }}
+                                >
+                                    {isBestMatch && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8, padding: '4px 10px', background: 'rgba(99,102,241,0.1)', borderRadius: 6, width: 'fit-content' }}>
+                                            <Sparkles size={10} color="#a78bfa" />
+                                            <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#a78bfa' }}>⭐ AI Best Match</span>
+                                        </div>
+                                    )}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                                        <div style={s.ngoIcon}><Heart size={18} color="#10b981" /></div>
+                                        <div style={{ flex: 1 }}>
+                                            <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>{ngo.name}</p>
+                                            <p style={{ fontSize: '0.7rem', color: '#64748b', marginTop: 1 }}>{ngo.desc}</p>
+                                        </div>
+                                        <div style={{ textAlign: 'right' }}>
+                                            <span className={`badge ${ngo.need === 'high' ? 'badge-gold' : ngo.need === 'medium' ? 'badge-blue' : 'badge-green'}`} style={{ fontSize: '0.6rem' }}>
+                                                {ngo.need === 'high' ? '🔴 High Need' : ngo.need === 'medium' ? '🟡 Medium' : '🟢 Low'}
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div style={{ textAlign: 'right' }}>
-                                        <span className={`badge ${ngo.need === 'high' ? 'badge-gold' : ngo.need === 'medium' ? 'badge-blue' : 'badge-green'}`} style={{ fontSize: '0.6rem' }}>
-                                            {ngo.need === 'high' ? '🔴 High Need' : ngo.need === 'medium' ? '🟡 Medium' : '🟢 Low'}
-                                        </span>
+                                    <div style={{ display: 'flex', gap: 10, paddingLeft: 50, flexWrap: 'wrap' }}>
+                                        <span style={s.ngoStat}><Star size={10} color="#f59e0b" fill="#f59e0b" /> {ngo.rating} ({ngo.reviews})</span>
+                                        <span style={s.ngoStat}><MapPin size={10} /> {ngo.dist}</span>
+                                        <span style={s.ngoStat}><Clock size={10} /> {ngo.timing}</span>
+                                        <span style={s.ngoStat}><Heart size={10} color="#ef4444" /> {ngo.served} served</span>
                                     </div>
-                                </div>
-                                <div style={{ display: 'flex', gap: 10, paddingLeft: 50, flexWrap: 'wrap' }}>
-                                    <span style={s.ngoStat}><Star size={10} color="#f59e0b" fill="#f59e0b" /> {ngo.rating} ({ngo.reviews})</span>
-                                    <span style={s.ngoStat}><MapPin size={10} /> {ngo.dist}</span>
-                                    <span style={s.ngoStat}><Clock size={10} /> {ngo.timing}</span>
-                                    <span style={s.ngoStat}><Heart size={10} color="#ef4444" /> {ngo.served} served</span>
-                                </div>
-                                {selectedNgo === i && (
-                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ paddingLeft: 50, marginTop: 8 }}>
-                                        <span style={s.ngoStat}><Phone size={10} /> {ngo.phone}</span>
-                                    </motion.div>
-                                )}
-                            </motion.div>
-                        ))}
+                                    {selectedNgo === filteredNgos.indexOf(ngo) && (
+                                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ paddingLeft: 50, marginTop: 8 }}>
+                                            <span style={s.ngoStat}><Phone size={10} /> {ngo.phone}</span>
+                                        </motion.div>
+                                    )}
+                                </motion.div>
+                            );
+                        })}
                     </div>
 
                     <button className="btn btn-primary" style={{ width: '100%', marginTop: 20 }} onClick={() => setStep(3)} disabled={selectedNgo === null}>
