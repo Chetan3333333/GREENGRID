@@ -157,28 +157,28 @@ export async function updateUserStats(userId, increments) {
     const userRef = ref(database, `users/${userId}`);
     const snapshot = await get(userRef);
 
-    if (snapshot.exists()) {
-        const current = snapshot.val();
-        const updates = {};
+    // If user profile doesn't exist, create a minimal one first
+    const current = snapshot.exists() ? snapshot.val() : { greenCoins: 0, itemsRecycled: 0, co2Reduced: 0, donations: 0, greenScore: 0 };
 
-        if (increments.greenCoins) {
-            updates.greenCoins = (current.greenCoins || 0) + increments.greenCoins;
-        }
-        if (increments.itemsRecycled) {
-            updates.itemsRecycled = (current.itemsRecycled || 0) + increments.itemsRecycled;
-        }
-        if (increments.co2Reduced) {
-            updates.co2Reduced = (current.co2Reduced || 0) + increments.co2Reduced;
-        }
-        if (increments.donations) {
-            updates.donations = (current.donations || 0) + increments.donations;
-        }
-        if (increments.greenScore !== undefined) {
-            updates.greenScore = increments.greenScore; // This one replaces, not adds
-        }
+    const updates = {};
 
-        await update(userRef, updates);
+    if (increments.greenCoins) {
+        updates.greenCoins = (current.greenCoins || 0) + increments.greenCoins;
     }
+    if (increments.itemsRecycled) {
+        updates.itemsRecycled = (current.itemsRecycled || 0) + increments.itemsRecycled;
+    }
+    if (increments.co2Reduced) {
+        updates.co2Reduced = (current.co2Reduced || 0) + increments.co2Reduced;
+    }
+    if (increments.donations) {
+        updates.donations = (current.donations || 0) + increments.donations;
+    }
+    if (increments.greenScore !== undefined) {
+        updates.greenScore = increments.greenScore;
+    }
+
+    await update(userRef, updates);
 }
 
 /**

@@ -48,11 +48,16 @@ export function AuthProvider({ children }) {
     }
 
     // Fetch user profile from Realtime Database
+    // If profile doesn't exist (old account), auto-create it
     async function fetchUserProfile(uid) {
         const userRef = ref(database, `users/${uid}`);
         const snapshot = await get(userRef);
         if (snapshot.exists()) {
             setUserProfile({ id: uid, ...snapshot.val() });
+        } else if (auth.currentUser) {
+            // Old account — create profile now
+            const newProfile = await createUserDocument(auth.currentUser);
+            setUserProfile({ id: uid, ...newProfile });
         }
     }
 
