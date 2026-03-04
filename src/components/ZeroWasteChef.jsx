@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
     Loader2, Sparkles, Send, ChevronRight, Plus, X,
-    Clock, Trophy, Flame, AlertTriangle, Trash2
+    Clock, Trophy, Flame, AlertTriangle, Trash2, Camera
 } from 'lucide-react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import {
@@ -77,8 +77,10 @@ export default function ZeroWasteChef({ userId }) {
     ]);
     const [input, setInput] = useState('');         // What user is typing
     const [chatLoading, setChatLoading] = useState(false); // AI is thinking?
+    const [chatPhoto, setChatPhoto] = useState(null);      // Photo attached to chat
     const chatEndRef = useRef(null);                       // Auto-scroll to bottom
     const chatHistory = useRef([]);                         // Memory of conversation
+    const chatFileRef = useRef(null);                       // Hidden file input for chat photo
 
     // ── Fridge State ──
     const [fridgeItems, setFridgeItems] = useState([]);
@@ -87,6 +89,8 @@ export default function ZeroWasteChef({ userId }) {
     const [newItemName, setNewItemName] = useState('');
     const [newItemExpiry, setNewItemExpiry] = useState('');
     const [newItemQty, setNewItemQty] = useState('');
+    const [scanLoading, setScanLoading] = useState(false); // AI scanning food photo for fridge
+    const scanFileRef = useRef(null);                       // Hidden file input for fridge scan
 
     // ── Scoreboard State ──
     const [wasteStats, setWasteStats] = useState([]);
@@ -117,47 +121,52 @@ export default function ZeroWasteChef({ userId }) {
 
     // ═══════════════════════════════════════════════
     // ── Step 3: Send Message to Gemini AI ──
-    // This is the CORE function. It:
-    // 1. Takes the user's message
-    // 2. Adds the system prompt + conversation history
-    // 3. Sends everything to Gemini
-    // 4. Gets the response and shows it
+    // Now supports BOTH text and photos!
+    // If a photo is attached, it sends the image to Gemini along with text
     // ═══════════════════════════════════════════════
-    async function sendMessage(text) {
-        if (!text.trim()) return;
+    async function sendMessage(text, photoBase64 = null) {
+        if (!text.trim() && !photoBase64) return;
 
-        // Show user's message on screen immediately
-        setMessages(prev => [...prev, { role: 'user', text }]);
+        // Show user's message on screen immediately (with photo if attached)
+        setMessages(prev => [...prev, { role: 'user', text: text || '📸 [Photo sent]', photo: photoBase64 }]);
         setInput('');
+        setChatPhoto(null);
         setChatLoading(true);
 
         try {
-            // Choose the AI model
             const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-            // Build the full prompt with context
-            // We include: system instructions + past conversation + new message
+            // Build the prompt parts array
+            // For text-only: just send the text prompt
+            // For text+photo: send [text, imageData] together
+            const parts = [];
+
             const fullPrompt = [
                 SYSTEM_PROMPT,
                 '',
                 'Conversation so far:',
                 ...chatHistory.current.map(m => `${m.role}: ${m.text}`),
                 '',
-                `User: ${text}`
+                `User: ${text || 'I sent you a photo of food. What do you see? Suggest Indian recipes to use it before it goes waste.'}`
             ].join('\n');
 
-            // Send to Gemini and wait for response
-            const result = await model.generateContent(fullPrompt);
+            parts.push(fullPrompt);
+
+            // If photo is attached, add it as image data for Gemini to analyze
+            if (photoBase64) {
+                const base64Data = photoBase64.split(',')[1];
+                parts.push({ inlineData: { data: base64Data, mimeType: 'image/jpeg' } });
+            }
+
+            const result = await model.generateContent(parts);
             const aiReply = result.response.text();
 
-            // Save to conversation history (keep last 16 messages for context)
-            chatHistory.current.push({ role: 'User', text });
+            chatHistory.current.push({ role: 'User', text: text || '[Photo sent]' });
             chatHistory.current.push({ role: 'Chef', text: aiReply });
             if (chatHistory.current.length > 16) {
                 chatHistory.current = chatHistory.current.slice(-12);
             }
 
-            // Show AI's response on screen
             setMessages(prev => [...prev, { role: 'ai', text: aiReply }]);
 
         } catch (err) {
@@ -169,6 +178,64 @@ export default function ZeroWasteChef({ userId }) {
         }
 
         setChatLoading(false);
+    }
+
+    // Handle photo selection for chat
+    function handleChatPhoto(e) {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (ev) => setChatPhoto(ev.target.result);
+            reader.readAsDataURL(file);
+        }
+    }
+
+    // ── AI Fridge Scanner ──
+    // Takes a photo, sends to Gemini, AI detects food items + expiry, auto-adds to fridge
+    async function scanFoodForFridge(e) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setScanLoading(true);
+        try {
+            const reader = new FileReader();
+            reader.onload = async (ev) => {
+                const base64Data = ev.target.result.split(',')[1];
+                const imagePart = { inlineData: { data: base64Data, mimeType: 'image/jpeg' } };
+
+                const prompt = `You are a food scanner for a fridge tracker app. Analyze this food image and return ONLY a valid JSON array (no markdown backticks). For EACH visible food item, return:
+                [
+                    { "name": "Tomatoes", "emoji": "🍅", "category": "vegetable", "estimatedExpiryDays": 5, "quantity": "500g", "preservationTip": "Store at room temperature. Refrigerate only when very ripe." }
+                ]
+                Categories: vegetable, fruit, dairy, grain, protein, packaged, cooked, other.
+                Be accurate with expiry estimates for Indian climate.`;
+
+                const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+                const result = await model.generateContent([prompt, imagePart]);
+                const text = result.response.text();
+                const clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                const items = JSON.parse(clean);
+
+                // Save each detected item to Firebase
+                for (const item of items) {
+                    const expDate = new Date();
+                    expDate.setDate(expDate.getDate() + (item.estimatedExpiryDays || 7));
+                    await saveFridgeItem(userId, {
+                        name: item.name,
+                        emoji: item.emoji || '🍽️',
+                        category: item.category || 'other',
+                        quantity: item.quantity || '',
+                        expiryDate: expDate.toISOString().split('T')[0],
+                        preservationTip: item.preservationTip || '',
+                    });
+                }
+                await loadFridge();
+                setScanLoading(false);
+            };
+            reader.readAsDataURL(file);
+        } catch (err) {
+            console.error('Scan failed:', err);
+            setScanLoading(false);
+        }
     }
 
     // ── Quick chip handlers ──
@@ -399,6 +466,7 @@ export default function ZeroWasteChef({ userId }) {
                                     background: msg.role === 'user' ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)',
                                     border: `1px solid ${msg.role === 'user' ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.06)'}`,
                                 }}>
+                                    {msg.photo && <img src={msg.photo} alt="food" style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 8, marginBottom: 6 }} />}
                                     <p style={{ fontSize: '0.78rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{msg.text}</p>
                                 </div>
                             </motion.div>
@@ -422,13 +490,28 @@ export default function ZeroWasteChef({ userId }) {
                         ))}
                     </div>
 
-                    {/* Text Input Bar */}
+                    {/* Photo Preview (shows when user has attached a photo) */}
+                    {chatPhoto && (
+                        <div style={{ position: 'relative', marginBottom: 6 }}>
+                            <img src={chatPhoto} alt="preview" style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' }} />
+                            <button onClick={() => setChatPhoto(null)} style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
+                                <X size={10} />
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Input Bar with Camera + Text + Send */}
+                    <input type="file" accept="image/*" capture="environment" ref={chatFileRef} onChange={handleChatPhoto} style={{ display: 'none' }} />
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <button onClick={() => chatFileRef.current?.click()}
+                            style={{ background: 'rgba(99,102,241,0.1)', border: 'none', borderRadius: 10, width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                            <Camera size={16} color="#a78bfa" />
+                        </button>
                         <input
                             value={input}
                             onChange={e => setInput(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
-                            placeholder="Type what food you have..."
+                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input, chatPhoto); } }}
+                            placeholder={chatPhoto ? 'Ask about this food...' : 'Type what food you have...'}
                             style={{
                                 flex: 1,
                                 background: 'rgba(255,255,255,0.04)',
@@ -441,17 +524,17 @@ export default function ZeroWasteChef({ userId }) {
                             }}
                         />
                         <button
-                            onClick={() => sendMessage(input)}
-                            disabled={chatLoading || !input.trim()}
+                            onClick={() => sendMessage(input, chatPhoto)}
+                            disabled={chatLoading || (!input.trim() && !chatPhoto)}
                             style={{
-                                background: input.trim() ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.04)',
+                                background: (input.trim() || chatPhoto) ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.04)',
                                 border: 'none', borderRadius: 10,
                                 width: 38, height: 38,
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                cursor: input.trim() ? 'pointer' : 'default',
+                                cursor: (input.trim() || chatPhoto) ? 'pointer' : 'default',
                                 flexShrink: 0,
                             }}>
-                            <Send size={16} color={input.trim() ? '#a78bfa' : '#475569'} />
+                            <Send size={16} color={(input.trim() || chatPhoto) ? '#a78bfa' : '#475569'} />
                         </button>
                     </div>
                 </div>
@@ -460,11 +543,19 @@ export default function ZeroWasteChef({ userId }) {
             {/* ═══ MY FRIDGE TAB ═══ */}
             {activeView === 'fridge' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {/* Add Item Button / Form */}
+                    {/* Add Item: Manual OR AI Scan */}
+                    <input type="file" accept="image/*" capture="environment" ref={scanFileRef} onChange={scanFoodForFridge} style={{ display: 'none' }} />
                     {!showAddForm ? (
-                        <button className="btn btn-sm btn-primary" style={{ fontSize: '0.75rem' }} onClick={() => setShowAddForm(true)}>
-                            <Plus size={14} /> Add Item to Fridge
-                        </button>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <button className="btn btn-sm btn-primary" style={{ flex: 1, fontSize: '0.75rem' }} onClick={() => setShowAddForm(true)}>
+                                <Plus size={14} /> Add Manually
+                            </button>
+                            <button className="btn btn-sm" style={{ flex: 1, fontSize: '0.75rem', background: 'rgba(99,102,241,0.12)', color: '#a78bfa', border: '1px solid rgba(99,102,241,0.2)' }}
+                                onClick={() => scanFileRef.current?.click()} disabled={scanLoading}>
+                                {scanLoading ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Scanning...</> : <><Camera size={14} /> 📸 AI Scan</>}
+                            </button>
+                            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                        </div>
                     ) : (
                         <div className="card card-sm" style={{ padding: 14 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
