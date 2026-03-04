@@ -235,6 +235,31 @@ export async function saveDonation(userId, donationData) {
     return { id: newRef.key, ...donation };
 }
 
+/**
+ * Get all donations for a specific user
+ */
+export async function getUserDonations(userId) {
+    const donRef = ref(database, 'donations');
+    const snapshot = await get(donRef);
+    if (!snapshot.exists()) return [];
+    const donations = [];
+    snapshot.forEach((child) => {
+        const don = child.val();
+        if (don.userId === userId) {
+            donations.push({ id: child.key, ...don });
+        }
+    });
+    return donations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+/**
+ * Update donation status
+ */
+export async function updateDonationStatus(donationId, newStatus) {
+    const donRef = ref(database, `donations/${donationId}`);
+    await update(donRef, { status: newStatus, updatedAt: new Date().toISOString() });
+}
+
 // ============================================
 // 🔄 REAL-TIME LISTENERS — For live updates
 // ============================================

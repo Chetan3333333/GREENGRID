@@ -16,6 +16,7 @@ const pageTitles = {
   '/direct-deal': 'Smart Deal',
   '/chatbot': 'GreenGrid AI',
   '/profile': 'Profile',
+  '/activity': 'My Activity',
 };
 
 const hideNavPaths = ['/', '/login', '/register'];

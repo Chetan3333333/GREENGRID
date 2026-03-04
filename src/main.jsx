@@ -19,6 +19,7 @@ import BiddingPage from './pages/BiddingPage.jsx';
 import DirectDealPage from './pages/DirectDealPage.jsx';
 import ChatbotPage from './pages/ChatbotPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
+import ActivityPage from './pages/ActivityPage.jsx';
 import './index.css';
 
 const router = createBrowserRouter([
@@ -41,6 +42,7 @@ const router = createBrowserRouter([
       { path: 'direct-deal', element: <ProtectedRoute><DirectDealPage /></ProtectedRoute> },
       { path: 'chatbot', element: <ProtectedRoute><ChatbotPage /></ProtectedRoute> },
       { path: 'profile', element: <ProtectedRoute><ProfilePage /></ProtectedRoute> },
+      { path: 'activity', element: <ProtectedRoute><ActivityPage /></ProtectedRoute> },
       { path: '*', element: <Navigate to="/home" replace /> },
     ],
   },

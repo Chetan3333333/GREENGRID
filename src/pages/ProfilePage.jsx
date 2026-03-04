@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
     User, Award, Coins, Recycle, Settings, ChevronRight,
-    Bell, Moon, LogOut, HelpCircle, Heart, Shield, TrendingUp
+    Bell, Moon, LogOut, HelpCircle, Heart, Shield, TrendingUp, Activity
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -98,6 +98,7 @@ export default function ProfilePage() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {[
+                        { label: 'My Activity', icon: Activity, color: '#ec4899', to: '/activity' },
                         { label: 'GreenCoins Wallet', icon: Coins, color: '#f59e0b', to: '/wallet' },
                         { label: 'Green Credit Score', icon: Award, color: '#10b981', to: '/credit-score' },
                         { label: 'Eco Marketplace', icon: Recycle, color: '#3b82f6', to: '/marketplace' },

@@ -5,7 +5,7 @@ import {
     ChevronRight, ArrowUpRight, ArrowDownLeft, Gavel, Leaf, Loader2, Banknote
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { getUserTransactions } from '../services/database';
+import { getUserTransactions, getUserDonations } from '../services/database';
 
 const fadeUp = (d = 0) => ({
     initial: { opacity: 0, y: 18 },
@@ -36,6 +36,7 @@ export default function WalletPage() {
     const [filter, setFilter] = useState('all');
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [pendingDonations, setPendingDonations] = useState([]);
 
     const greenCoins = userProfile?.greenCoins ?? 0;
 
@@ -58,7 +59,15 @@ export default function WalletPage() {
             }
             setLoading(false);
         }
+        async function loadPending() {
+            if (!currentUser) return;
+            try {
+                const dons = await getUserDonations(currentUser.uid);
+                setPendingDonations(dons.filter(d => d.status !== 'delivered'));
+            } catch (err) { console.error(err); }
+        }
         loadTransactions();
+        loadPending();
     }, [currentUser]);
 
     // Calculate stats from real transactions
@@ -124,6 +133,34 @@ export default function WalletPage() {
                     </div>
                 </div>
             </motion.div>
+
+            {/* Pending Rewards */}
+            {pendingDonations.length > 0 && (
+                <motion.div
+                    {...fadeUp(0.06)}
+                    className="card card-sm"
+                    style={{ marginBottom: 12, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)', padding: 16 }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                        <span style={{ fontSize: '1.1rem' }}>🕐</span>
+                        <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#f59e0b' }}>Pending Rewards</span>
+                        <span className="badge badge-gold" style={{ marginLeft: 'auto', fontSize: '0.6rem' }}>{pendingDonations.length} active</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {pendingDonations.map(don => (
+                            <div key={don.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                                <span style={{ fontSize: '1.2rem' }}>🍎</span>
+                                <div style={{ flex: 1 }}>
+                                    <p style={{ fontSize: '0.8rem', fontWeight: 500 }}>{don.ngoName}</p>
+                                    <p style={{ fontSize: '0.65rem', color: '#64748b' }}>{don.quantity} · {don.status}</p>
+                                </div>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#f59e0b' }}>+150 🪙</span>
+                            </div>
+                        ))}
+                    </div>
+                    <p style={{ fontSize: '0.65rem', color: '#64748b', marginTop: 8, textAlign: 'center' }}>Coins will be credited after delivery confirmation</p>
+                </motion.div>
+            )}
 
             {/* ₹ Real Money Earnings */}
             <motion.div

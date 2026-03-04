@@ -6,7 +6,7 @@ import {
     Upload, X, Leaf, Package, UtensilsCrossed, Egg
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { addTransaction, updateUserStats, saveDonation } from '../services/database';
+import { addTransaction, updateUserStats, saveDonation, getUserDonations, updateDonationStatus } from '../services/database';
 import { useNavigate } from 'react-router-dom';
 
 const fadeUp = (d = 0) => ({
@@ -65,6 +65,9 @@ export default function FoodPage() {
     // Wizard state
     const [step, setStep] = useState(0); // 0 = landing, 1-6 = steps
     const [loading, setLoading] = useState(false);
+    const [myDonations, setMyDonations] = useState([]);
+    const [donationsLoading, setDonationsLoading] = useState(false);
+    const [lastDonationId, setLastDonationId] = useState(null);
 
     // Step 1 — Food details
     const [foodType, setFoodType] = useState(null);
@@ -86,6 +89,13 @@ export default function FoodPage() {
     // Step 5 — Tracking
     const [trackIdx, setTrackIdx] = useState(0);
 
+    // Load donations when on My Donations tab
+    useEffect(() => {
+        if (tab !== 'mydonations' || !currentUser) return;
+        setDonationsLoading(true);
+        getUserDonations(currentUser.uid).then(d => { setMyDonations(d); setDonationsLoading(false); }).catch(() => setDonationsLoading(false));
+    }, [tab, currentUser]);
+
     // Simulate tracking progression
     useEffect(() => {
         if (step !== 5) return;
@@ -93,7 +103,7 @@ export default function FoodPage() {
         const ids = timers.map((ms, i) =>
             setTimeout(() => setTrackIdx(i + 1), ms)
         );
-        const final = setTimeout(() => setStep(6), 10000);
+        const final = setTimeout(() => handleDeliveryComplete(), 10000);
         return () => { ids.forEach(clearTimeout); clearTimeout(final); };
     }, [step]);
 
@@ -118,12 +128,28 @@ export default function FoodPage() {
         setTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
     }
 
-    // Submit donation
+    // After tracking completes — award coins
+    async function handleDeliveryComplete() {
+        if (!currentUser) { setStep(6); return; }
+        try {
+            await addTransaction(currentUser.uid, {
+                type: 'earn', coins: 150,
+                reason: `Food delivered to ${ngoData?.name}`,
+                emoji: '🍎',
+            });
+            await updateUserStats(currentUser.uid, { greenCoins: 150, donations: 1, co2Reduced: 2 });
+            if (lastDonationId) await updateDonationStatus(lastDonationId, 'delivered');
+            await fetchUserProfile(currentUser.uid);
+        } catch (err) { console.error(err); }
+        setStep(6);
+    }
+
+    // Submit donation — save but DON'T award coins yet
     async function handleConfirm() {
         if (!currentUser) return;
         setLoading(true);
         try {
-            await saveDonation(currentUser.uid, {
+            const result = await saveDonation(currentUser.uid, {
                 foodType,
                 quantity: `${quantity} ${quantityUnit}`,
                 expiry,
@@ -134,13 +160,7 @@ export default function FoodPage() {
                 address,
                 timeSlot: timeSlots.find(t => t.value === timeSlot)?.label || '',
             });
-            await addTransaction(currentUser.uid, {
-                type: 'earn', coins: 150,
-                reason: `Food donated to ${ngoData?.name}`,
-                emoji: '🍎',
-            });
-            await updateUserStats(currentUser.uid, { greenCoins: 150, donations: 1, co2Reduced: 2 });
-            await fetchUserProfile(currentUser.uid);
+            setLastDonationId(result.id);
             setStep(5);
             setTrackIdx(0);
         } catch (err) { console.error(err); }
@@ -345,6 +365,7 @@ export default function FoodPage() {
                     <motion.div {...fadeUp(0.15)} className="tab-pills" style={{ marginBottom: 18 }}>
                         <button className={`tab-pill ${tab === 'edible' ? 'active' : ''}`} onClick={() => setTab('edible')}>🍎 Edible Food</button>
                         <button className={`tab-pill ${tab === 'compost' ? 'active' : ''}`} onClick={() => setTab('compost')}>🌱 Compost</button>
+                        <button className={`tab-pill ${tab === 'mydonations' ? 'active' : ''}`} onClick={() => setTab('mydonations')}>📋 My Donations</button>
                     </motion.div>
 
                     {tab === 'edible' ? (
@@ -392,7 +413,7 @@ export default function FoodPage() {
                                 </div>
                             </motion.div>
                         </>
-                    ) : (
+                    ) : tab === 'compost' ? (
                         /* Compost Tab — unchanged */
                         <motion.div {...fadeUp(0.2)}>
                             <div className="section-header"><span className="section-title">Composting Options</span></div>
@@ -419,6 +440,86 @@ export default function FoodPage() {
                                     </div>
                                 </div>
                             </div>
+                        </motion.div>
+                    ) : (
+                        /* My Donations Tab */
+                        <motion.div {...fadeUp(0.2)}>
+                            <div className="section-header">
+                                <span className="section-title">Your Donations</span>
+                                <span className="badge badge-green">{myDonations.length} total</span>
+                            </div>
+
+                            {donationsLoading ? (
+                                <div style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>
+                                    <Loader2 size={24} style={{ animation: 'spin 1s linear infinite' }} />
+                                    <p style={{ marginTop: 8, fontSize: '0.85rem' }}>Loading donations...</p>
+                                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                                </div>
+                            ) : myDonations.length === 0 ? (
+                                <div className="card" style={{ textAlign: 'center', padding: 40 }}>
+                                    <p style={{ fontSize: '2rem', marginBottom: 8 }}>🍎</p>
+                                    <p style={{ fontWeight: 600, fontSize: '0.95rem' }}>No donations yet</p>
+                                    <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 4 }}>Start donating to see your history here!</p>
+                                    <button className="btn btn-primary btn-sm" style={{ marginTop: 16 }} onClick={() => { setTab('edible'); setStep(1); }}>
+                                        Start First Donation <ArrowRight size={14} />
+                                    </button>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                    {/* Active / Pending */}
+                                    {myDonations.filter(d => d.status !== 'delivered').length > 0 && (
+                                        <>
+                                            <p style={{ fontSize: '0.78rem', fontWeight: 600, color: '#f59e0b', marginBottom: 2 }}>🔔 Active / Pending</p>
+                                            {myDonations.filter(d => d.status !== 'delivered').map((don) => (
+                                                <motion.div key={don.id} className="card card-sm" style={{ borderLeftWidth: 3, borderLeftColor: '#f59e0b' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                        <span style={{ fontSize: '1.5rem' }}>{foodTypes.find(f => f.id === don.foodType)?.emoji || '🍎'}</span>
+                                                        <div style={{ flex: 1 }}>
+                                                            <p style={{ fontWeight: 600, fontSize: '0.88rem' }}>{foodTypes.find(f => f.id === don.foodType)?.label || don.foodType}</p>
+                                                            <p style={{ fontSize: '0.72rem', color: '#64748b' }}>{don.quantity} · {don.ngoName}</p>
+                                                        </div>
+                                                        <div style={{ textAlign: 'right' }}>
+                                                            <span className="badge badge-gold" style={{ fontSize: '0.6rem' }}>
+                                                                {don.status === 'submitted' ? '📋 Submitted' : don.status === 'ngo_notified' ? '🔔 Notified' : don.status === 'pickup_scheduled' ? '🚗 Pickup' : don.status === 'collected' ? '📦 Collected' : don.status}
+                                                            </span>
+                                                            <p style={{ fontSize: '0.6rem', color: '#f59e0b', marginTop: 3 }}>🕐 +150 pending</p>
+                                                        </div>
+                                                    </div>
+                                                    <p style={{ fontSize: '0.65rem', color: '#475569', marginTop: 6 }}>
+                                                        {new Date(don.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                        {don.pickupMode === 'pickup' ? ' · 🚗 Pickup' : ' · 📍 Drop-off'}
+                                                    </p>
+                                                </motion.div>
+                                            ))}
+                                        </>
+                                    )}
+
+                                    {/* Completed */}
+                                    {myDonations.filter(d => d.status === 'delivered').length > 0 && (
+                                        <>
+                                            <p style={{ fontSize: '0.78rem', fontWeight: 600, color: '#10b981', marginTop: 8, marginBottom: 2 }}>✅ Completed</p>
+                                            {myDonations.filter(d => d.status === 'delivered').map((don) => (
+                                                <motion.div key={don.id} className="card card-sm" style={{ borderLeftWidth: 3, borderLeftColor: '#10b981', opacity: 0.85 }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                        <span style={{ fontSize: '1.5rem' }}>{foodTypes.find(f => f.id === don.foodType)?.emoji || '🍎'}</span>
+                                                        <div style={{ flex: 1 }}>
+                                                            <p style={{ fontWeight: 600, fontSize: '0.88rem' }}>{foodTypes.find(f => f.id === don.foodType)?.label || don.foodType}</p>
+                                                            <p style={{ fontSize: '0.72rem', color: '#64748b' }}>{don.quantity} · {don.ngoName}</p>
+                                                        </div>
+                                                        <div style={{ textAlign: 'right' }}>
+                                                            <span className="badge badge-green" style={{ fontSize: '0.6rem' }}>✅ Delivered</span>
+                                                            <p style={{ fontSize: '0.6rem', color: '#10b981', marginTop: 3 }}>+150 🪙 earned</p>
+                                                        </div>
+                                                    </div>
+                                                    <p style={{ fontSize: '0.65rem', color: '#475569', marginTop: 6 }}>
+                                                        {new Date(don.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                    </p>
+                                                </motion.div>
+                                            ))}
+                                        </>
+                                    )}
+                                </div>
+                            )}
                         </motion.div>
                     )}
                 </>
