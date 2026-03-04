@@ -173,7 +173,7 @@ export default function ZeroWasteChef({ userId }) {
             console.error('AI error:', err);
             setMessages(prev => [...prev, {
                 role: 'ai',
-                text: '😅 Sorry, I had trouble connecting to AI. Please check your internet and try again!'
+                text: `😅 AI Error: ${err.message || 'Unknown error'}\n\nIf you see "API key" error → your Gemini key may be invalid.\nIf you see "quota" → you've hit the free limit.\nIf you see "fetch" → check your internet connection.`
             }]);
         }
 
