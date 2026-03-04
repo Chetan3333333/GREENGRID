@@ -236,21 +236,28 @@ export default function ElectronicsPage() {
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                         {ngosList.map((ngo, i) => (
-                            <motion.div key={i} className="card card-sm" style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }} whileTap={{ scale: 0.98 }}
-                                onClick={() => !actionDone.includes(`d${i}`) && handleAction(`Donated device to ${ngo.name}`, 200, '💻', `d${i}`)}
-                            >
-                                <div style={{ ...s.merchIcon, background: 'rgba(16,185,129,0.1)' }}>
-                                    {actionDone.includes(`d${i}`) ? <CheckCircle size={20} color="#10b981" /> : actionLoading === `d${i}` ? <Loader2 size={20} color="#10b981" style={{ animation: 'spin 1s linear infinite' }} /> : <Heart size={20} color="#10b981" />}
+                            <motion.div key={i} className="card card-sm" style={{ cursor: 'default' }} whileTap={{ scale: 0.99 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                    <div style={{ ...s.merchIcon, background: 'rgba(16,185,129,0.1)' }}>
+                                        {actionDone.includes(`d${i}`) ? <CheckCircle size={20} color="#10b981" /> : actionLoading === `d${i}` ? <Loader2 size={20} color="#10b981" style={{ animation: 'spin 1s linear infinite' }} /> : <Heart size={20} color="#10b981" />}
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>{ngo.name}</p>
+                                        <p style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 2 }}>{ngo.type} · Accepts {ngo.items}</p>
+                                    </div>
+                                    {actionDone.includes(`d${i}`) ? (
+                                        <span className="badge badge-green">+200 🪙</span>
+                                    ) : (
+                                        <button
+                                            className="btn btn-primary btn-sm"
+                                            style={{ whiteSpace: 'nowrap' }}
+                                            onClick={(e) => { e.stopPropagation(); handleAction(`Donated device to ${ngo.name}`, 200, '💻', `d${i}`); }}
+                                            disabled={actionLoading !== null}
+                                        >
+                                            {actionLoading === `d${i}` ? 'Saving...' : 'Donate'}
+                                        </button>
+                                    )}
                                 </div>
-                                <div style={{ flex: 1 }}>
-                                    <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>{ngo.name}</p>
-                                    <p style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 2 }}>{ngo.type} · Accepts {ngo.items}</p>
-                                </div>
-                                {actionDone.includes(`d${i}`) ? (
-                                    <span className="badge badge-green">+200 🪙</span>
-                                ) : (
-                                    <ChevronRight size={16} color="#475569" />
-                                )}
                             </motion.div>
                         ))}
                         {actionLoading && <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>}
