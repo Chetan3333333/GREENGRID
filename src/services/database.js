@@ -261,6 +261,69 @@ export async function updateDonationStatus(donationId, newStatus) {
 }
 
 // ============================================
+// 🧊 FRIDGE TRACKER — Zero Waste Chef
+// ============================================
+
+export async function saveFridgeItem(userId, itemData) {
+    const fridgeRef = ref(database, `fridge/${userId}`);
+    const newRef = push(fridgeRef);
+    const item = {
+        ...itemData,
+        addedAt: new Date().toISOString(),
+        status: 'active',
+    };
+    await set(newRef, item);
+    return { id: newRef.key, ...item };
+}
+
+export async function getFridgeItems(userId) {
+    const fridgeRef = ref(database, `fridge/${userId}`);
+    const snapshot = await get(fridgeRef);
+    if (!snapshot.exists()) return [];
+    const items = [];
+    snapshot.forEach((child) => {
+        items.push({ id: child.key, ...child.val() });
+    });
+    return items.sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
+}
+
+export async function deleteFridgeItem(userId, itemId) {
+    const itemRef = ref(database, `fridge/${userId}/${itemId}`);
+    await set(itemRef, null);
+}
+
+export async function updateFridgeItem(userId, itemId, updates) {
+    const itemRef = ref(database, `fridge/${userId}/${itemId}`);
+    await update(itemRef, updates);
+}
+
+// ============================================
+// 📊 WASTE STATS — Track food saved/wasted
+// ============================================
+
+export async function saveWasteLog(userId, logData) {
+    const wasteRef = ref(database, `wasteStats/${userId}`);
+    const newRef = push(wasteRef);
+    const log = {
+        ...logData,
+        createdAt: new Date().toISOString(),
+    };
+    await set(newRef, log);
+    return { id: newRef.key, ...log };
+}
+
+export async function getWasteStats(userId) {
+    const wasteRef = ref(database, `wasteStats/${userId}`);
+    const snapshot = await get(wasteRef);
+    if (!snapshot.exists()) return [];
+    const logs = [];
+    snapshot.forEach((child) => {
+        logs.push({ id: child.key, ...child.val() });
+    });
+    return logs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+// ============================================
 // 🔄 REAL-TIME LISTENERS — For live updates
 // ============================================
 

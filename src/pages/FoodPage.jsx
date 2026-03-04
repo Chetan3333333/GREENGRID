@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { addTransaction, updateUserStats, saveDonation, getUserDonations, updateDonationStatus } from '../services/database';
 import { useNavigate } from 'react-router-dom';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import ZeroWasteChef from '../components/ZeroWasteChef';
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || '');
@@ -517,60 +518,8 @@ export default function FoodPage() {
                                     ))}
                                 </div>
                             </motion.div>
-
-                            {/* AI Recipe Suggestions */}
-                            <motion.div {...fadeUp(0.4)} style={{ marginTop: 16 }}>
-                                <div className="section-header">
-                                    <span className="section-title">AI Recipe Saver</span>
-                                    <span className="badge badge-blue" style={{ fontSize: '0.58rem' }}><Sparkles size={8} /> Gemini AI</span>
-                                </div>
-                                <div className="card" style={{ padding: 20, background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(59,130,246,0.04))', border: '1px solid rgba(99,102,241,0.18)' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                                        <span style={{ fontSize: '1.5rem' }}>👨‍🍳</span>
-                                        <div>
-                                            <p style={{ fontWeight: 700, fontSize: '0.9rem' }}>Got leftovers? Don’t waste them!</p>
-                                            <p style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 2 }}>Snap a photo — AI suggests recipes or helps you donate</p>
-                                        </div>
-                                    </div>
-                                    <input type="file" accept="image/*" capture="environment" ref={recipeFileRef} onChange={handleRecipePhoto} style={{ display: 'none' }} />
-                                    {!recipePhoto ? (
-                                        <button className="btn btn-sm" style={{ width: '100%', background: 'rgba(99,102,241,0.12)', color: '#a78bfa', border: '1px solid rgba(99,102,241,0.2)' }} onClick={() => recipeFileRef.current?.click()}>
-                                            <Camera size={14} /> Snap Food Photo for Recipes
-                                        </button>
-                                    ) : (
-                                        <>
-                                            <img src={recipePhoto} alt="food" style={{ width: '100%', height: 100, objectFit: 'cover', borderRadius: 10, marginBottom: 10, border: '1px solid rgba(255,255,255,0.1)' }} />
-                                            {recipeLoading ? (
-                                                <div style={{ textAlign: 'center', padding: 16 }}>
-                                                    <Loader2 size={18} color="#a78bfa" style={{ animation: 'spin 1s linear infinite' }} />
-                                                    <p style={{ fontSize: '0.78rem', color: '#a78bfa', marginTop: 6 }}>👨‍🍳 Chef AI is thinking...</p>
-                                                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                                                </div>
-                                            ) : recipeResult ? (
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                                    {recipeResult.map((r, i) => (
-                                                        <motion.div key={i} className="card card-sm" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 12 }}>
-                                                            <span style={{ fontSize: '1.3rem' }}>{r.emoji}</span>
-                                                            <div style={{ flex: 1 }}>
-                                                                <p style={{ fontWeight: 600, fontSize: '0.82rem' }}>{r.name}</p>
-                                                                <p style={{ fontSize: '0.65rem', color: '#64748b' }}>⏰ {r.time} · {r.difficulty}</p>
-                                                            </div>
-                                                        </motion.div>
-                                                    ))}
-                                                    <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                                                        <button className="btn btn-sm btn-secondary" style={{ flex: 1, fontSize: '0.72rem' }} onClick={() => { setRecipePhoto(null); setRecipeResult(null); }}>
-                                                            <RotateCcw size={12} /> Try Again
-                                                        </button>
-                                                        <button className="btn btn-sm btn-primary" style={{ flex: 1, fontSize: '0.72rem' }} onClick={() => { setRecipePhoto(null); setRecipeResult(null); setStep(1); }}>
-                                                            <Heart size={12} /> Donate Instead
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ) : null}
-                                        </>
-                                    )}
-                                </div>
-                            </motion.div>
+                            {/* Zero Waste Chef */}
+                            {currentUser && <ZeroWasteChef userId={currentUser.uid} onDonate={() => setStep(1)} />}
                         </>
                     ) : tab === 'compost' ? (
                         /* Compost Tab — unchanged */
