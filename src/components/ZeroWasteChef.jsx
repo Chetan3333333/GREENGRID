@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
     Loader2, Sparkles, Send, ChevronRight, Plus, X,
-    Clock, Trophy, Flame, AlertTriangle, Trash2, Camera
+    Clock, Trophy, Flame, AlertTriangle, Trash2, Camera, ShoppingCart, BarChart3, Filter
 } from 'lucide-react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import {
@@ -54,6 +54,23 @@ function expiryLabel(days) {
     return `🟢 ${days} days left`;
 }
 
+// ── Category definitions ──
+const CATEGORIES = [
+    { id: 'all', label: 'All', emoji: '📦' },
+    { id: 'vegetable', label: 'Vegetables', emoji: '🥬' },
+    { id: 'fruit', label: 'Fruits', emoji: '🍎' },
+    { id: 'dairy', label: 'Dairy', emoji: '🥛' },
+    { id: 'grain', label: 'Grains', emoji: '🌾' },
+    { id: 'protein', label: 'Protein', emoji: '🍗' },
+    { id: 'packaged', label: 'Packaged', emoji: '📦' },
+    { id: 'cooked', label: 'Cooked', emoji: '🍲' },
+    { id: 'other', label: 'Other', emoji: '🍽️' },
+];
+
+function categoryEmoji(cat) {
+    return CATEGORIES.find(c => c.id === cat)?.emoji || '🍽️';
+}
+
 // ── Quick action chips that send pre-written prompts to AI ──
 const quickChips = [
     { label: '🧊 Storage Tips', prompt: 'Give me storage and preservation tips for common Indian kitchen items like rice, dal, vegetables, milk, curd, and bread. Be specific about temperatures and durations.' },
@@ -89,8 +106,11 @@ export default function ZeroWasteChef({ userId }) {
     const [newItemName, setNewItemName] = useState('');
     const [newItemExpiry, setNewItemExpiry] = useState('');
     const [newItemQty, setNewItemQty] = useState('');
-    const [scanLoading, setScanLoading] = useState(false); // AI scanning food photo for fridge
-    const scanFileRef = useRef(null);                       // Hidden file input for fridge scan
+    const [newItemCategory, setNewItemCategory] = useState('other');
+    const [scanLoading, setScanLoading] = useState(false);
+    const scanFileRef = useRef(null);
+    const [fridgeFilter, setFridgeFilter] = useState('all');    // Category filter
+    const [shoppingList, setShoppingList] = useState([]);       // Quick re-add list
 
     // ── Scoreboard State ──
     const [wasteStats, setWasteStats] = useState([]);
@@ -264,8 +284,8 @@ export default function ZeroWasteChef({ userId }) {
         })();
         await saveFridgeItem(userId, {
             name: newItemName.trim(),
-            emoji: '🍽️',
-            category: 'other',
+            emoji: categoryEmoji(newItemCategory),
+            category: newItemCategory,
             quantity: newItemQty || '1',
             expiryDate: expDate,
             preservationTip: '',
@@ -273,6 +293,7 @@ export default function ZeroWasteChef({ userId }) {
         setNewItemName('');
         setNewItemExpiry('');
         setNewItemQty('');
+        setNewItemCategory('other');
         setShowAddForm(false);
         await loadFridge();
     }
@@ -281,6 +302,11 @@ export default function ZeroWasteChef({ userId }) {
     async function handleUsed(item) {
         await deleteFridgeItem(userId, item.id);
         await saveWasteLog(userId, { itemName: item.name, action: 'used', weight: item.quantity, co2Saved: 0.5 });
+        // Add to shopping list for quick re-add
+        setShoppingList(prev => {
+            if (prev.find(s => s.name === item.name)) return prev;
+            return [...prev, { name: item.name, emoji: item.emoji, category: item.category, quantity: item.quantity }].slice(-10);
+        });
         await loadFridge();
         await loadStats();
     }
@@ -290,6 +316,26 @@ export default function ZeroWasteChef({ userId }) {
         await saveWasteLog(userId, { itemName: item.name, action: 'wasted', weight: item.quantity, co2Saved: 0 });
         await loadFridge();
         await loadStats();
+    }
+
+    // ── Use It All: send every fridge item to Chef AI ──
+    function handleUseItAll() {
+        const active = fridgeItems.filter(f => f.status === 'active');
+        if (!active.length) return;
+        const itemList = active.map(f => `${f.name} (${f.quantity}, expires in ${daysUntil(f.expiryDate)} days)`).join(', ');
+        sendMessage(`I have ALL these items in my fridge and I want ZERO waste. Create a complete meal plan that uses EVERY item before they expire. Prioritize items expiring soonest. Items: ${itemList}`);
+        setActiveView('chat');
+    }
+
+    // ── Quick Re-add from shopping list ──
+    async function reAddItem(item) {
+        const expDate = new Date(); expDate.setDate(expDate.getDate() + 7);
+        await saveFridgeItem(userId, {
+            name: item.name, emoji: item.emoji, category: item.category || 'other',
+            quantity: item.quantity || '1', expiryDate: expDate.toISOString().split('T')[0], preservationTip: '',
+        });
+        setShoppingList(prev => prev.filter(s => s.name !== item.name));
+        await loadFridge();
     }
 
     // ── Scoreboard calculations ──
@@ -541,102 +587,230 @@ export default function ZeroWasteChef({ userId }) {
             )}
 
             {/* ═══ MY FRIDGE TAB ═══ */}
-            {activeView === 'fridge' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {/* Add Item: Manual OR AI Scan */}
-                    <input type="file" accept="image/*" capture="environment" ref={scanFileRef} onChange={scanFoodForFridge} style={{ display: 'none' }} />
-                    {!showAddForm ? (
-                        <div style={{ display: 'flex', gap: 8 }}>
-                            <button className="btn btn-sm btn-primary" style={{ flex: 1, fontSize: '0.75rem' }} onClick={() => setShowAddForm(true)}>
-                                <Plus size={14} /> Add Manually
-                            </button>
-                            <button className="btn btn-sm" style={{ flex: 1, fontSize: '0.75rem', background: 'rgba(99,102,241,0.12)', color: '#a78bfa', border: '1px solid rgba(99,102,241,0.2)' }}
-                                onClick={() => scanFileRef.current?.click()} disabled={scanLoading}>
-                                {scanLoading ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Scanning...</> : <><Camera size={14} /> 📸 AI Scan</>}
-                            </button>
-                            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                        </div>
-                    ) : (
-                        <div className="card card-sm" style={{ padding: 14 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                                <p style={{ fontWeight: 700, fontSize: '0.85rem' }}>Add Item</p>
-                                <button onClick={() => setShowAddForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}><X size={16} /></button>
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                <input
-                                    value={newItemName}
-                                    onChange={e => setNewItemName(e.target.value)}
-                                    placeholder="Item name (e.g., Tomatoes)"
-                                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 12px', fontSize: '0.82rem', color: '#e2e8f0', outline: 'none' }}
-                                />
-                                <div style={{ display: 'flex', gap: 8 }}>
-                                    <input
-                                        value={newItemQty}
-                                        onChange={e => setNewItemQty(e.target.value)}
-                                        placeholder="Qty (e.g., 500g)"
-                                        style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 12px', fontSize: '0.82rem', color: '#e2e8f0', outline: 'none' }}
-                                    />
-                                    <input
-                                        type="date"
-                                        value={newItemExpiry}
-                                        onChange={e => setNewItemExpiry(e.target.value)}
-                                        style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 12px', fontSize: '0.82rem', color: '#e2e8f0', outline: 'none' }}
-                                    />
-                                </div>
-                                <button className="btn btn-sm btn-primary" onClick={addItemToFridge} disabled={!newItemName.trim()} style={{ fontSize: '0.75rem' }}>
-                                    ✅ Add to Fridge
-                                </button>
-                            </div>
-                        </div>
-                    )}
+            {activeView === 'fridge' && (() => {
+                const active = fridgeItems.filter(f => f.status === 'active');
+                const filtered = fridgeFilter === 'all' ? active : active.filter(f => f.category === fridgeFilter);
+                const freshCount = active.filter(f => daysUntil(f.expiryDate) > 5).length;
+                const soonCount = active.filter(f => { const d = daysUntil(f.expiryDate); return d > 0 && d <= 5; }).length;
+                const expiredCount = active.filter(f => daysUntil(f.expiryDate) <= 0).length;
+                const oldest = active.length ? active.reduce((o, f) => !o || new Date(f.createdAt) < new Date(o.createdAt) ? f : o, null) : null;
+                const urgentItems = active.filter(f => daysUntil(f.expiryDate) <= 2 && daysUntil(f.expiryDate) >= 0);
+                // Waste analytics
+                const thisWeek = wasteStats.filter(w => (new Date() - new Date(w.createdAt)) < 7 * 86400000);
+                const lastWeek = wasteStats.filter(w => { const d = new Date() - new Date(w.createdAt); return d >= 7 * 86400000 && d < 14 * 86400000; });
+                const thisWeekWasted = thisWeek.filter(w => w.action === 'wasted').length;
+                const lastWeekWasted = lastWeek.filter(w => w.action === 'wasted').length;
+                const thisWeekSaved = thisWeek.filter(w => w.action === 'used').length;
+                const saveRate = (thisWeekSaved + thisWeekWasted) > 0 ? Math.round((thisWeekSaved / (thisWeekSaved + thisWeekWasted)) * 100) : 0;
 
-                    {/* Fridge Items List */}
-                    {fridgeLoading ? (
-                        <div style={{ textAlign: 'center', padding: 30, color: '#64748b' }}>
-                            <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
-                            <p style={{ fontSize: '0.82rem', marginTop: 8 }}>Loading fridge...</p>
-                            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+                        {/* ── 1. Fridge Summary Card ── */}
+                        <div className="card" style={{ padding: 14, background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(59,130,246,0.04))', border: '1px solid rgba(99,102,241,0.15)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                                <p style={{ fontWeight: 700, fontSize: '0.88rem' }}>🧊 Fridge Summary</p>
+                                <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>{active.length} items</span>
+                            </div>
+                            {/* Freshness Meter */}
+                            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                                <div style={{ flex: freshCount || 1, height: 6, borderRadius: 3, background: '#10b981', transition: 'flex 0.3s' }} />
+                                <div style={{ flex: soonCount || 0.3, height: 6, borderRadius: 3, background: '#f59e0b', transition: 'flex 0.3s' }} />
+                                <div style={{ flex: expiredCount || 0.3, height: 6, borderRadius: 3, background: '#ef4444', transition: 'flex 0.3s' }} />
+                            </div>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <span style={{ fontSize: '0.62rem', color: '#10b981' }}>🟢 {freshCount} Fresh</span>
+                                <span style={{ fontSize: '0.62rem', color: '#f59e0b' }}>🟡 {soonCount} Soon</span>
+                                <span style={{ fontSize: '0.62rem', color: '#ef4444' }}>🔴 {expiredCount} Expired</span>
+                            </div>
+                            {oldest && <p style={{ fontSize: '0.6rem', color: '#64748b', marginTop: 6 }}>Oldest: {oldest.name} (added {Math.floor((new Date() - new Date(oldest.createdAt)) / 86400000)} days ago)</p>}
                         </div>
-                    ) : fridgeItems.filter(f => f.status === 'active').length === 0 ? (
-                        <div className="card card-sm" style={{ textAlign: 'center', padding: 30 }}>
-                            <p style={{ fontSize: '1.5rem', marginBottom: 8 }}>🧊</p>
-                            <p style={{ fontWeight: 600, fontSize: '0.88rem' }}>Fridge is empty!</p>
-                            <p style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 4 }}>Add food items to start tracking expiry dates</p>
-                        </div>
-                    ) : (
-                        fridgeItems.filter(f => f.status === 'active').map((item, i) => {
-                            const days = daysUntil(item.expiryDate);
-                            return (
-                                <motion.div key={item.id} className="card card-sm" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }}
-                                    style={{ borderLeftWidth: 3, borderLeftColor: expiryColor(days), padding: 12 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                        <span style={{ fontSize: '1.3rem' }}>{item.emoji}</span>
+
+                        {/* ── 2. Smart Expiry Alert ── */}
+                        {urgentItems.length > 0 && (
+                            <div className="card card-sm" style={{ padding: 12, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                                <p style={{ fontWeight: 700, fontSize: '0.82rem', color: '#f87171', marginBottom: 6 }}>⚠️ Expiring Soon!</p>
+                                {urgentItems.slice(0, 3).map((item, i) => (
+                                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+                                        <span style={{ fontSize: '1rem' }}>{item.emoji}</span>
                                         <div style={{ flex: 1 }}>
-                                            <p style={{ fontWeight: 600, fontSize: '0.82rem' }}>{item.name}</p>
-                                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 2 }}>
-                                                <span style={{ fontSize: '0.62rem', color: '#64748b' }}>{item.quantity}</span>
-                                                <span style={{ fontSize: '0.62rem', fontWeight: 600, color: expiryColor(days) }}>{expiryLabel(days)}</span>
+                                            <p style={{ fontSize: '0.75rem', fontWeight: 500 }}>{item.name} — {expiryLabel(daysUntil(item.expiryDate))}</p>
+                                        </div>
+                                        <button className="btn btn-sm" style={{ fontSize: '0.58rem', padding: '2px 6px', background: 'rgba(99,102,241,0.1)', color: '#a78bfa', border: 'none' }}
+                                            onClick={() => { sendMessage(`My ${item.name} (${item.quantity}) expires in ${daysUntil(item.expiryDate)} days! Quick Indian recipe + preservation tip please.`); setActiveView('chat'); }}>
+                                            🍳 Recipe
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* ── 3. Action Buttons Row ── */}
+                        <input type="file" accept="image/*" capture="environment" ref={scanFileRef} onChange={scanFoodForFridge} style={{ display: 'none' }} />
+                        {!showAddForm ? (
+                            <div style={{ display: 'flex', gap: 6 }}>
+                                <button className="btn btn-sm btn-primary" style={{ flex: 1, fontSize: '0.7rem' }} onClick={() => setShowAddForm(true)}>
+                                    <Plus size={12} /> Add
+                                </button>
+                                <button className="btn btn-sm" style={{ flex: 1, fontSize: '0.7rem', background: 'rgba(99,102,241,0.12)', color: '#a78bfa', border: '1px solid rgba(99,102,241,0.2)' }}
+                                    onClick={() => scanFileRef.current?.click()} disabled={scanLoading}>
+                                    {scanLoading ? <><Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> Scan...</> : <><Camera size={12} /> AI Scan</>}
+                                </button>
+                                <button className="btn btn-sm" style={{ flex: 1, fontSize: '0.7rem', background: 'rgba(16,185,129,0.1)', color: '#34d399', border: '1px solid rgba(16,185,129,0.2)' }}
+                                    onClick={handleUseItAll} disabled={!active.length}>
+                                    🍳 Use All
+                                </button>
+                                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                            </div>
+                        ) : (
+                            <div className="card card-sm" style={{ padding: 14 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                    <p style={{ fontWeight: 700, fontSize: '0.85rem' }}>Add Item</p>
+                                    <button onClick={() => setShowAddForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}><X size={16} /></button>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    <input value={newItemName} onChange={e => setNewItemName(e.target.value)} placeholder="Item name (e.g., Tomatoes)"
+                                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 12px', fontSize: '0.82rem', color: '#e2e8f0', outline: 'none' }} />
+                                    <div style={{ display: 'flex', gap: 8 }}>
+                                        <input value={newItemQty} onChange={e => setNewItemQty(e.target.value)} placeholder="Qty (e.g., 500g)"
+                                            style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 12px', fontSize: '0.82rem', color: '#e2e8f0', outline: 'none' }} />
+                                        <input type="date" value={newItemExpiry} onChange={e => setNewItemExpiry(e.target.value)}
+                                            style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 12px', fontSize: '0.82rem', color: '#e2e8f0', outline: 'none' }} />
+                                    </div>
+                                    {/* Category Selector */}
+                                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                        {CATEGORIES.filter(c => c.id !== 'all').map(c => (
+                                            <button key={c.id} onClick={() => setNewItemCategory(c.id)}
+                                                style={{
+                                                    padding: '4px 8px', fontSize: '0.62rem', borderRadius: 6, border: newItemCategory === c.id ? '1px solid rgba(99,102,241,0.4)' : '1px solid rgba(255,255,255,0.06)',
+                                                    background: newItemCategory === c.id ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.02)', color: newItemCategory === c.id ? '#a78bfa' : '#94a3b8', cursor: 'pointer'
+                                                }}>
+                                                {c.emoji} {c.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <button className="btn btn-sm btn-primary" onClick={addItemToFridge} disabled={!newItemName.trim()} style={{ fontSize: '0.75rem' }}>
+                                        ✅ Add to Fridge
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── 4. Category Filters ── */}
+                        <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 2 }}>
+                            {CATEGORIES.filter(c => c.id === 'all' || active.some(f => f.category === c.id)).map(c => (
+                                <button key={c.id} onClick={() => setFridgeFilter(c.id)}
+                                    style={{
+                                        padding: '3px 8px', fontSize: '0.6rem', borderRadius: 12, whiteSpace: 'nowrap',
+                                        border: fridgeFilter === c.id ? '1px solid rgba(99,102,241,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                                        background: fridgeFilter === c.id ? 'rgba(99,102,241,0.12)' : 'transparent',
+                                        color: fridgeFilter === c.id ? '#a78bfa' : '#94a3b8', cursor: 'pointer'
+                                    }}>
+                                    {c.emoji} {c.label} {c.id !== 'all' ? `(${active.filter(f => f.category === c.id).length})` : `(${active.length})`}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* ── 5. Fridge Items List ── */}
+                        {fridgeLoading ? (
+                            <div style={{ textAlign: 'center', padding: 30, color: '#64748b' }}>
+                                <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+                                <p style={{ fontSize: '0.82rem', marginTop: 8 }}>Loading fridge...</p>
+                            </div>
+                        ) : filtered.length === 0 ? (
+                            <div className="card card-sm" style={{ textAlign: 'center', padding: 30 }}>
+                                <p style={{ fontSize: '1.5rem', marginBottom: 8 }}>🧊</p>
+                                <p style={{ fontWeight: 600, fontSize: '0.88rem' }}>{fridgeFilter === 'all' ? 'Fridge is empty!' : `No ${fridgeFilter} items`}</p>
+                                <p style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 4 }}>Add food items to start tracking</p>
+                            </div>
+                        ) : (
+                            filtered.map((item, i) => {
+                                const days = daysUntil(item.expiryDate);
+                                return (
+                                    <motion.div key={item.id} className="card card-sm" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }}
+                                        style={{ borderLeftWidth: 3, borderLeftColor: expiryColor(days), padding: 12 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                            <span style={{ fontSize: '1.3rem' }}>{item.emoji}</span>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    <p style={{ fontWeight: 600, fontSize: '0.82rem' }}>{item.name}</p>
+                                                    <span style={{ fontSize: '0.5rem', padding: '1px 5px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', color: '#64748b' }}>{item.category}</span>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 2 }}>
+                                                    <span style={{ fontSize: '0.62rem', color: '#64748b' }}>{item.quantity}</span>
+                                                    <span style={{ fontSize: '0.62rem', fontWeight: 600, color: expiryColor(days) }}>{expiryLabel(days)}</span>
+                                                </div>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: 4 }}>
+                                                <button onClick={() => handleUsed(item)} title="Used it" style={{ background: 'rgba(16,185,129,0.1)', border: 'none', borderRadius: 6, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                                                    <span style={{ fontSize: '0.7rem' }}>✅</span>
+                                                </button>
+                                                <button onClick={() => handleWasted(item)} title="Wasted" style={{ background: 'rgba(239,68,68,0.1)', border: 'none', borderRadius: 6, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                                                    <span style={{ fontSize: '0.7rem' }}>🗑️</span>
+                                                </button>
+                                                <button onClick={() => { sendMessage(`I have ${item.name} (${item.quantity}) expiring in ${days} days. Quick Indian recipe and storage tip please.`); setActiveView('chat'); }} title="Recipe"
+                                                    style={{ background: 'rgba(99,102,241,0.1)', border: 'none', borderRadius: 6, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                                                    <span style={{ fontSize: '0.7rem' }}>🍳</span>
+                                                </button>
                                             </div>
                                         </div>
-                                        <div style={{ display: 'flex', gap: 4 }}>
-                                            <button onClick={() => handleUsed(item)} title="Used it" style={{ background: 'rgba(16,185,129,0.1)', border: 'none', borderRadius: 6, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                                                <span style={{ fontSize: '0.7rem' }}>✅</span>
-                                            </button>
-                                            <button onClick={() => handleWasted(item)} title="Wasted" style={{ background: 'rgba(239,68,68,0.1)', border: 'none', borderRadius: 6, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                                                <span style={{ fontSize: '0.7rem' }}>🗑️</span>
-                                            </button>
-                                            <button onClick={() => { sendMessage(`I have ${item.name} (${item.quantity}) expiring in ${days} days. Quick Indian recipe and storage tip please.`); setActiveView('chat'); }} title="Recipe"
-                                                style={{ background: 'rgba(99,102,241,0.1)', border: 'none', borderRadius: 6, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                                                <span style={{ fontSize: '0.7rem' }}>🍳</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            );
-                        })
-                    )}
-                </div>
-            )}
+                                    </motion.div>
+                                );
+                            })
+                        )}
+
+                        {/* ── 6. Shopping List (Quick Re-Add) ── */}
+                        {shoppingList.length > 0 && (
+                            <div className="card card-sm" style={{ padding: 12 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                                    <ShoppingCart size={14} color="#60a5fa" />
+                                    <p style={{ fontWeight: 700, fontSize: '0.82rem' }}>Buy Again?</p>
+                                    <button onClick={() => setShoppingList([])} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', fontSize: '0.6rem' }}>Clear</button>
+                                </div>
+                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                    {shoppingList.map((item, i) => (
+                                        <button key={i} onClick={() => reAddItem(item)}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 8, fontSize: '0.68rem',
+                                                background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.15)', color: '#93c5fd', cursor: 'pointer'
+                                            }}>
+                                            {item.emoji} {item.name} <Plus size={10} />
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── 7. Waste Analytics Mini ── */}
+                        <div className="card card-sm" style={{ padding: 12, background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.1)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                                <BarChart3 size={14} color="#34d399" />
+                                <p style={{ fontWeight: 700, fontSize: '0.82rem' }}>Weekly Waste Tracker</p>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <div style={{ flex: 1, textAlign: 'center', padding: 8, background: 'rgba(16,185,129,0.08)', borderRadius: 8 }}>
+                                    <p style={{ fontWeight: 800, fontSize: '1rem', color: '#34d399' }}>{saveRate}%</p>
+                                    <p style={{ fontSize: '0.55rem', color: '#64748b' }}>Save Rate</p>
+                                </div>
+                                <div style={{ flex: 1, textAlign: 'center', padding: 8, background: 'rgba(239,68,68,0.06)', borderRadius: 8 }}>
+                                    <p style={{ fontWeight: 800, fontSize: '1rem', color: thisWeekWasted < lastWeekWasted ? '#34d399' : thisWeekWasted > lastWeekWasted ? '#ef4444' : '#f59e0b' }}>
+                                        {thisWeekWasted < lastWeekWasted ? '📉' : thisWeekWasted > lastWeekWasted ? '📈' : '➡️'} {thisWeekWasted}
+                                    </p>
+                                    <p style={{ fontSize: '0.55rem', color: '#64748b' }}>Wasted this week</p>
+                                </div>
+                                <div style={{ flex: 1, textAlign: 'center', padding: 8, background: 'rgba(99,102,241,0.06)', borderRadius: 8 }}>
+                                    <p style={{ fontWeight: 800, fontSize: '1rem', color: '#a78bfa' }}>
+                                        {lastWeekWasted > thisWeekWasted ? `${lastWeekWasted - thisWeekWasted} less` : lastWeekWasted < thisWeekWasted ? `${thisWeekWasted - lastWeekWasted} more` : 'Same'}
+                                    </p>
+                                    <p style={{ fontSize: '0.55rem', color: '#64748b' }}>vs last week</p>
+                                </div>
+                            </div>
+                            {saveRate >= 80 && <p style={{ fontSize: '0.65rem', color: '#34d399', marginTop: 6, textAlign: 'center' }}>🏆 Amazing! You're saving {saveRate}% of your food!</p>}
+                            {saveRate > 0 && saveRate < 50 && <p style={{ fontSize: '0.65rem', color: '#f59e0b', marginTop: 6, textAlign: 'center' }}>💪 Keep going! Try using expiring items first.</p>}
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* ═══ SCOREBOARD TAB ═══ */}
             {activeView === 'scoreboard' && (
