@@ -62,6 +62,8 @@ export default function ElectronicsPage() {
     const { currentUser, fetchUserProfile } = useAuth();
     const [actionLoading, setActionLoading] = useState(null);
     const [actionDone, setActionDone] = useState([]);
+    const [bidConfirm, setBidConfirm] = useState(null); // { listingId, merchant, bid }
+    const [bidAccepted, setBidAccepted] = useState([]); // listing IDs that have been accepted
 
     async function handleAction(label, coins, emoji, index) {
         if (!currentUser || actionLoading !== null) return;
@@ -75,6 +77,23 @@ export default function ElectronicsPage() {
             await updateUserStats(currentUser.uid, updates);
             await fetchUserProfile(currentUser.uid);
             setActionDone(prev => [...prev, index]);
+        } catch (err) { console.error(err); }
+        setActionLoading(null);
+    }
+
+    async function handleBidAccept(listing, bestBid) {
+        if (!currentUser || actionLoading !== null) return;
+        setActionLoading(`bid_${listing.id}`);
+        try {
+            await addTransaction(currentUser.uid, {
+                type: 'earn', coins: 200,
+                reason: `Bid accepted: ${listing.item} → ${bestBid.merchant} (₹${bestBid.bid})`,
+                emoji: '⚡',
+            });
+            await updateUserStats(currentUser.uid, { greenCoins: 200, itemsRecycled: 1 });
+            await fetchUserProfile(currentUser.uid);
+            setBidAccepted(prev => [...prev, listing.id]);
+            setBidConfirm(null);
         } catch (err) { console.error(err); }
         setActionLoading(null);
     }
@@ -145,19 +164,21 @@ export default function ElectronicsPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                         {ewasteBids.map((listing) => {
                             const highestBid = Math.max(...listing.bids.map(b => b.bid));
+                            const bestBid = listing.bids.find(b => b.bid === highestBid);
                             const isExpanded = expandedBid === listing.id;
+                            const isAccepted = bidAccepted.includes(listing.id);
 
                             return (
                                 <motion.div
                                     key={listing.id}
                                     className="card"
                                     layout
-                                    style={{ overflow: 'hidden' }}
+                                    style={{ overflow: 'hidden', opacity: isAccepted ? 0.7 : 1 }}
                                 >
                                     {/* Listing Header */}
                                     <div
                                         style={{ cursor: 'pointer' }}
-                                        onClick={() => setExpandedBid(isExpanded ? null : listing.id)}
+                                        onClick={() => !isAccepted && setExpandedBid(isExpanded ? null : listing.id)}
                                     >
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                                             <div>
@@ -165,22 +186,32 @@ export default function ElectronicsPage() {
                                                 <p style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 2 }}>{listing.materials}</p>
                                             </div>
                                             <div style={{ textAlign: 'right' }}>
-                                                <span style={{ fontWeight: 800, color: '#10b981', fontSize: '1.1rem' }}>₹{highestBid}</span>
-                                                <p style={{ fontSize: '0.6rem', color: '#64748b' }}>highest bid</p>
+                                                {isAccepted ? (
+                                                    <span className="badge badge-green">✅ Sold</span>
+                                                ) : (
+                                                    <>
+                                                        <span style={{ fontWeight: 800, color: '#10b981', fontSize: '1.1rem' }}>₹{highestBid}</span>
+                                                        <p style={{ fontSize: '0.6rem', color: '#64748b' }}>highest bid</p>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                         <div style={{ display: 'flex', gap: 8 }}>
                                             <span className="badge badge-blue">{listing.category}</span>
                                             <span className="badge badge-gold">AI: {listing.aiValue}</span>
-                                            <span className="badge" style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)', fontSize: '0.6rem' }}>
-                                                {listing.bids.length} bids
-                                            </span>
+                                            {isAccepted ? (
+                                                <span className="badge badge-green">Accepted ✅</span>
+                                            ) : (
+                                                <span className="badge" style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)', fontSize: '0.6rem' }}>
+                                                    {listing.bids.length} bids
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
 
                                     {/* Expanded Bids */}
                                     <AnimatePresence>
-                                        {isExpanded && (
+                                        {isExpanded && !isAccepted && (
                                             <motion.div
                                                 initial={{ opacity: 0, height: 0 }}
                                                 animate={{ opacity: 1, height: 'auto' }}
@@ -210,13 +241,35 @@ export default function ElectronicsPage() {
                                                         </div>
                                                     ))}
                                                 </div>
-                                                <button
-                                                    className="btn btn-primary btn-sm"
-                                                    style={{ width: '100%', marginTop: 12 }}
-                                                    onClick={() => navigate('/bidding')}
-                                                >
-                                                    <Gavel size={14} /> Accept Best Bid (₹{highestBid})
-                                                </button>
+
+                                                {/* Confirm Dialog */}
+                                                {bidConfirm === listing.id ? (
+                                                    <motion.div
+                                                        initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                                                        style={{ padding: 12, background: 'rgba(16,185,129,0.06)', borderRadius: 10, border: '1px solid rgba(16,185,129,0.15)', marginTop: 12 }}
+                                                    >
+                                                        <p style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: 4 }}>Accept ₹{highestBid} from {bestBid.merchant}?</p>
+                                                        <p style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: 10 }}>You'll earn +200 GreenCoins 🪙</p>
+                                                        <div style={{ display: 'flex', gap: 8 }}>
+                                                            <button className="btn btn-sm btn-secondary" style={{ flex: 1 }} onClick={(e) => { e.stopPropagation(); setBidConfirm(null); }}>Cancel</button>
+                                                            <button
+                                                                className="btn btn-sm btn-primary" style={{ flex: 1 }}
+                                                                onClick={(e) => { e.stopPropagation(); handleBidAccept(listing, bestBid); }}
+                                                                disabled={actionLoading === `bid_${listing.id}`}
+                                                            >
+                                                                {actionLoading === `bid_${listing.id}` ? 'Processing...' : '✅ Confirm'}
+                                                            </button>
+                                                        </div>
+                                                    </motion.div>
+                                                ) : (
+                                                    <button
+                                                        className="btn btn-primary btn-sm"
+                                                        style={{ width: '100%', marginTop: 12 }}
+                                                        onClick={(e) => { e.stopPropagation(); setBidConfirm(listing.id); }}
+                                                    >
+                                                        <Gavel size={14} /> Accept Best Bid (₹{highestBid})
+                                                    </button>
+                                                )}
                                             </motion.div>
                                         )}
                                     </AnimatePresence>
