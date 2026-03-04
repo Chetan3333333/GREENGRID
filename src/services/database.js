@@ -208,6 +208,34 @@ export function calculateGreenScore(userProfile) {
 }
 
 // ============================================
+// 🍎 DONATIONS — Save food donation records
+// ============================================
+
+/**
+ * Save a food donation record
+ */
+export async function saveDonation(userId, donationData) {
+    const donRef = ref(database, 'donations');
+    const newRef = push(donRef);
+    const donation = {
+        userId,
+        foodType: donationData.foodType || '',
+        quantity: donationData.quantity || '',
+        expiry: donationData.expiry || '',
+        photoURL: donationData.photoURL || null,
+        notes: donationData.notes || [],
+        ngoName: donationData.ngoName || '',
+        pickupMode: donationData.pickupMode || 'pickup',
+        address: donationData.address || '',
+        timeSlot: donationData.timeSlot || '',
+        status: 'submitted',
+        createdAt: new Date().toISOString(),
+    };
+    await set(newRef, donation);
+    return { id: newRef.key, ...donation };
+}
+
+// ============================================
 // 🔄 REAL-TIME LISTENERS — For live updates
 // ============================================
 
